@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  # Quality Check: Linting
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Run Lint
+        run: npm run lint
+
+  # Correctness Check: Unit Tests
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Run Tests
+        # Ensure your test script in package.json is "vitest --run" (not watch mode)
+        run: npm test
+
+  # Deployability Check: Docker Build
+  build-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      - name: Build Docker Image
+        # This builds the image but doesn't push it anywhere.
+        # It verifies the Dockerfile is valid and the app builds successfully in container.
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: movie-app:latest
+          # Use cache to speed up repeated builds
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

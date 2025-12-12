@@ -1,0 +1,367 @@
+/**
+ * M3U8 Proxy API
+ * 
+ * Proxies m3u8 video stream requests to bypass CORS restrictions.
+ * This allows the frontend to play videos from third-party sources.
+ * 
+ * Query Parameters:
+ * - token: Playback token containing the URL (preferred)
+ * - url: The m3u8 URL to proxy (legacy, URL encoded)
+ * - adFree: Enable ad filtering (requires premium subscription)
+ * 
+ * Requirements: 2.1, 2.2, 2.4, 2.5
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { filterM3U8Ads, AdFilterConfig } from '@/lib/ad-filter';
+import { verifyPlaybackToken, generatePlaybackToken } from '@/services/playback-token.service';
+
+// Force dynamic rendering to fix build errors with searchParams
+export const dynamic = 'force-dynamic';
+
+// 移动端使用更长的超时时间（Requirements: 2.4）
+const FETCH_TIMEOUT = 20000; // 20秒
+
+/**
+ * 解析URL中的相对路径，返回绝对URL
+ * 支持多种相对路径格式：
+ * - 绝对URL: http://example.com/path
+ * - 绝对路径: /path/to/file
+ * - 相对路径: path/to/file 或 ./path/to/file 或 ../path/to/file
+ * 
+ * Requirements: 2.2
+ */
+function resolveUrl(urlStr: string, baseUrl: string, origin: string): string {
+  const trimmed = urlStr.trim();
+  
+  // 已经是绝对URL
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed;
+  }
+  
+  // 绝对路径（以/开头）
+  if (trimmed.startsWith('/')) {
+    return origin + trimmed;
+  }
+  
+  // 处理 ./ 开头的相对路径
+  let relativePath = trimmed;
+  if (relativePath.startsWith('./')) {
+    relativePath = relativePath.substring(2);
+  }
+  
+  // 处理 ../ 开头的相对路径
+  if (relativePath.startsWith('../')) {
+    try {
+      return new URL(relativePath, baseUrl).toString();
+    } catch {
+      // 如果URL构造失败，回退到简单拼接
+      return baseUrl + relativePath;
+    }
+  }
+  
+  // 普通相对路径
+  return baseUrl + relativePath;
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const searchParams = request.nextUrl.searchParams;
+    const token = searchParams.get('token');
+    const url = searchParams.get('url');
+
+    // 解析目标URL
+    let targetUrl = url;
+    let isPreview = false;
+
+    if (token) {
+      const payload = verifyPlaybackToken(token);
+      if (!payload) {
+        console.error('[M3U8 Proxy] Token verification failed', { 
+          tokenLength: token.length,
+          tokenPrefix: token.substring(0, 20) + '...',
+        });
+        // 回退到legacy模式以支持移动端播放
+        if (url) {
+          console.log('[M3U8 Proxy] Falling back to legacy URL mode');
+          targetUrl = url;
+          isPreview = false;
+        } else {
+          return NextResponse.json(
+            { code: 'FORBIDDEN', message: 'Invalid or expired playback token' },
+            { status: 403 }
+          );
+        }
+      } else {
+        targetUrl = payload.url;
+        isPreview = payload.isPreview;
+      }
+    } else if (url) {
+      // Legacy模式：支持直接URL以保持向后兼容
+      targetUrl = url;
+      isPreview = false;
+    }
+
+    if (!targetUrl) {
+      return NextResponse.json(
+        { code: 'VALIDATION_ERROR', message: 'URL is required' },
+        { status: 400 }
+      );
+    }
+
+    // 解码URL（legacy模式的URL是编码的）
+    const decodedUrl = decodeURIComponent(targetUrl);
+    const adFree = searchParams.get('adFree') === 'true';
+
+    // 验证URL格式
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(decodedUrl);
+    } catch {
+      return NextResponse.json(
+        { code: 'VALIDATION_ERROR', message: 'Invalid URL format' },
+        { status: 400 }
+      );
+    }
+
+    // User-Agent策略 - 使用通用的UA以兼容大多数视频源
+    const userAgents = [
+      'AptvPlayer/1.4.10',
+      'Dalvik/2.1.0 (Linux; U; Android 12; Pixel 6 Build/SD1A.210817.023)',
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15',
+    ];
+
+    // 使用视频源的origin作为referer
+    const referers = [
+      parsedUrl.origin + '/',
+      '',
+    ];
+
+    let response: Response | null = null;
+    let lastError: Error | null = null;
+
+    // Try different combinations of User-Agent and Referer
+    outer: for (const userAgent of userAgents) {
+      for (const referer of referers) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
+
+          // Build headers - some servers reject requests with Origin header
+          const headers: Record<string, string> = {
+            'User-Agent': userAgent,
+            'Accept': '*/*',
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+          };
+          
+          // Only add Referer if not empty
+          if (referer) {
+            headers['Referer'] = referer;
+          }
+
+          response = await fetch(decodedUrl, {
+            headers,
+            signal: controller.signal,
+          });
+
+          clearTimeout(timeoutId);
+
+          if (response.ok) {
+            break outer; // Success, exit both loops
+          }
+        } catch (err) {
+          if (err instanceof Error && err.name === 'AbortError') {
+            lastError = new Error('Request timeout');
+          } else {
+            lastError = err instanceof Error ? err : new Error(String(err));
+          }
+        }
+      }
+    }
+
+    if (!response) {
+      throw lastError || new Error('All referer attempts failed');
+    }
+
+    if (!response.ok) {
+      return NextResponse.json(
+        { code: 'PROXY_ERROR', message: `Failed to fetch: ${response.status}` },
+        { status: response.status }
+      );
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+    const content = await response.text();
+
+    if (contentType.includes('mpegurl') || decodedUrl.endsWith('.m3u8')) {
+      // 使用重定向后的最终URL作为基础URL（Requirements: 2.5）
+      const finalUrl = response.url || decodedUrl;
+      const baseUrl = finalUrl.substring(0, finalUrl.lastIndexOf('/') + 1);
+      
+      // 解析最终URL以获取origin
+      let finalOrigin: string;
+      try {
+        finalOrigin = new URL(finalUrl).origin;
+      } catch {
+        finalOrigin = parsedUrl.origin;
+      }
+
+      let processedContent = content;
+
+      // 预览模式截断逻辑（3分钟）
+      if (isPreview) {
+        try {
+          const lines = content.split('\n');
+          const truncatedLines: string[] = [];
+          let currentDuration = 0;
+          const MAX_PREVIEW_DURATION = 180; // 3分钟
+
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (line.startsWith('#EXTINF:')) {
+              const match = line.match(/#EXTINF:([\d.]+)/);
+              if (match) {
+                const segDuration = parseFloat(match[1]);
+                if (currentDuration + segDuration > MAX_PREVIEW_DURATION) {
+                  break;
+                }
+                currentDuration += segDuration;
+              }
+            }
+            truncatedLines.push(lines[i]);
+          }
+
+          truncatedLines.push('#EXT-X-ENDLIST');
+          processedContent = truncatedLines.join('\n');
+        } catch (e) {
+          console.error('[M3U8 Proxy] Truncation error:', e);
+        }
+      }
+
+      // 广告过滤
+      let adFilterStats = { filtered: 0, total: 0 };
+      if (adFree) {
+        const adFilterConfig: Partial<AdFilterConfig> = {
+          enabled: true,
+          filterDiscontinuitySections: true,
+          filterDiscontinuity: true,
+          maxAdSectionDuration: 120,
+          minMainContentSegments: 10,
+        };
+
+        const filterResult = filterM3U8Ads(processedContent, baseUrl, adFilterConfig);
+        processedContent = filterResult.filteredContent;
+        adFilterStats = {
+          filtered: filterResult.filteredSegments,
+          total: filterResult.totalSegments,
+        };
+      }
+
+      // URL重写（Requirements: 2.2）
+      const rewrittenContent = processedContent.split('\n').map(line => {
+        const trimmedLine = line.trim();
+
+        // 跳过空行
+        if (!trimmedLine) {
+          return line;
+        }
+
+        // 处理EXT-X-KEY中的URI
+        if (trimmedLine.includes('URI="')) {
+          return trimmedLine.replace(/URI="([^"]+)"/, (match, uri) => {
+            const absoluteUri = resolveUrl(uri, baseUrl, finalOrigin);
+            const keyToken = generatePlaybackToken({
+              url: absoluteUri,
+              isPreview: isPreview
+            });
+            return `URI="/api/proxy/m3u8?token=${keyToken}"`;
+          });
+        }
+
+        // 跳过其他注释/标签
+        if (trimmedLine.startsWith('#')) {
+          return line;
+        }
+
+        // 解析相对URL为绝对URL
+        const absoluteUrl = resolveUrl(trimmedLine, baseUrl, finalOrigin);
+
+        // 代理.ts分段
+        if (trimmedLine.endsWith('.ts') || trimmedLine.includes('.ts?') || 
+            trimmedLine.includes('.ts#') || /\.ts\b/.test(trimmedLine)) {
+          return `/api/proxy/ts?url=${encodeURIComponent(absoluteUrl)}`;
+        }
+
+        // 代理嵌套的m3u8文件
+        if (trimmedLine.endsWith('.m3u8') || trimmedLine.includes('.m3u8?') ||
+            trimmedLine.includes('.m3u8#') || /\.m3u8\b/.test(trimmedLine)) {
+          const adFreeParam = adFree ? '&adFree=true' : '';
+          const subToken = generatePlaybackToken({
+            url: absoluteUrl,
+            isPreview: isPreview
+          });
+          return `/api/proxy/m3u8?token=${subToken}${adFreeParam}`;
+        }
+
+        // 其他文件类型也通过代理（如.key文件）
+        if (!trimmedLine.startsWith('/api/proxy/')) {
+          return `/api/proxy/ts?url=${encodeURIComponent(absoluteUrl)}`;
+        }
+
+        return line;
+      }).join('\n');
+
+      // 设置响应头（Requirements: 2.1）
+      const responseHeaders: HeadersInit = {
+        'Content-Type': 'application/vnd.apple.mpegurl',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Headers': '*',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+      };
+
+      if (adFree && adFilterStats.filtered > 0) {
+        responseHeaders['X-Ad-Filter-Total'] = adFilterStats.total.toString();
+        responseHeaders['X-Ad-Filter-Removed'] = adFilterStats.filtered.toString();
+      }
+
+      if (isPreview) {
+        responseHeaders['X-Preview-Mode'] = 'true';
+      }
+
+      return new NextResponse(rewrittenContent, {
+        status: 200,
+        headers: responseHeaders,
+      });
+    }
+
+    return new NextResponse(content, {
+      status: 200,
+      headers: {
+        'Content-Type': contentType,
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
+  } catch (error) {
+    console.error('M3U8 proxy error:', error);
+    return NextResponse.json(
+      { code: 'PROXY_ERROR', message: 'Failed to proxy request' },
+      { status: 500 }
+    );
+  }
+}
+
+
+
+// Handle OPTIONS requests for CORS preflight
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': '*',
+      'Access-Control-Max-Age': '86400',
+    },
+  });
+}

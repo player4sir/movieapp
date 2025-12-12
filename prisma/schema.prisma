@@ -1,0 +1,139 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  user
+  admin
+}
+
+enum UserStatus {
+  active
+  disabled
+}
+
+enum MemberLevel {
+  free
+  vip
+  svip
+}
+
+model User {
+  id           String         @id @default(cuid())
+  username     String         @unique
+  passwordHash String
+  nickname     String         @default("")
+  avatar       String         @default("")
+  role         UserRole       @default(user)
+  status       UserStatus     @default(active)
+  memberLevel  MemberLevel    @default(free)
+  memberExpiry DateTime?
+  groupId      String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  lastLoginAt  DateTime?
+  favorites    Favorite[]
+  watchHistory WatchHistory[]
+  group        UserGroup?     @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  sessions     UserSession[]
+
+  @@index([username])
+  @@index([status])
+  @@index([memberLevel])
+  @@index([groupId])
+  @@index([createdAt])
+}
+
+model UserGroup {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String   @default("")
+  color       String   @default("#6b7280")
+  permissions Json     @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  users       User[]
+
+  @@index([name])
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  vodId     Int
+  vodName   String
+  vodPic    String
+  typeName  String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, vodId])
+  @@index([userId])
+  @@index([vodId])
+}
+
+model WatchHistory {
+  id           String   @id @default(cuid())
+  userId       String
+  vodId        Int
+  vodName      String
+  vodPic       String
+  episodeIndex Int      @default(0)
+  episodeName  String   @default("")
+  position     Int      @default(0)
+  duration     Int      @default(0)
+  sourceIndex  Int      @default(0)
+  watchedAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, vodId])
+  @@index([userId])
+  @@index([watchedAt])
+}
+
+
+model UserSession {
+  id             String   @id @default(cuid())
+  userId         String
+  refreshToken   String   @unique
+  deviceInfo     String   @default("")
+  ipAddress      String   @default("")
+  userAgent      String   @default("")
+  lastActivityAt DateTime @default(now())
+  createdAt      DateTime @default(now())
+  expiresAt      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([refreshToken])
+  @@index([expiresAt])
+}
+
+
+model VideoSource {
+  id                   String    @id @default(cuid())
+  name                 String
+  apiUrl               String
+  timeout              Int       @default(10000)
+  retries              Int       @default(3)
+  enabled              Boolean   @default(true)
+  priority             Int       @default(0)
+  lastTestAt           DateTime?
+  lastTestResult       Boolean?
+  lastTestResponseTime Int?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([enabled])
+  @@index([priority])
+}

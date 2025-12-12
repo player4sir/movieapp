@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "MembershipOrder_user_plan_pending_key" ON "MembershipOrder" USING btree ("userId","planId") WHERE status = 'pending';

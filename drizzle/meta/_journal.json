@@ -1,0 +1,55 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1765146295224,
+      "tag": "0000_premium_talos",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1765184493029,
+      "tag": "0001_chunky_stark_industries",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1765222996711,
+      "tag": "0002_odd_anita_blake",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1765272304694,
+      "tag": "0003_unknown_venom",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1765296751765,
+      "tag": "0004_bouncy_invisible_woman",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1765374299641,
+      "tag": "0005_dizzy_sentinels",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1765375420082,
+      "tag": "0006_cuddly_emma_frost",
+      "breakpoints": true
+    }
+  ]
+}

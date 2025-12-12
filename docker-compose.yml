@@ -1,0 +1,21 @@
+version: '3'
+
+services:
+  app:
+    container_name: movie-app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - VIDEO_API_URL=${VIDEO_API_URL}
+      - PLAYBACK_TOKEN_SECRET=${PLAYBACK_TOKEN_SECRET:-default-playback-secret-change-me}
+    # If you have a local postgres container, uncomment below and adjust DATABASE_URL
+    # depends_on:
+    #   - db
