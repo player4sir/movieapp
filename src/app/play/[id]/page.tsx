@@ -85,10 +85,13 @@ function PlayPageContent() {
   // 开发阶段默认开启广告过滤，方便测试
   const [adFreeEnabled, setAdFreeEnabled] = useState(true);
   const [isPremiumUser, setIsPremiumUser] = useState(true);
+  const [isVipUser, setIsVipUser] = useState(false);
 
   // Paywall state
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
   const [accessType, setAccessType] = useState<string | null>(null);
+  // Track which episodes are unlocked for this VOD
+  const [unlockedEpisodes, setUnlockedEpisodes] = useState<Set<number>>(new Set());
   const [contentPrice, setContentPrice] = useState<number>(0);
   const [showUnlockModal, setShowUnlockModal] = useState(false);
 
@@ -143,8 +146,8 @@ function PlayPageContent() {
     checkContentAccess();
   }, [vod, selectedEpisodeIndex, sourceCategory, checkAccess, selectedSourceIndex, isAuthenticated, authLoading]);
 
-  // Check if user has premium subscription for ad-free
-  // Keep initial true values for dev/testing, only update if API returns valid response
+  // Check if user has premium subscription for ad-free and VIP status
+  // Also fetch unlocked episodes for this VOD
   useEffect(() => {
     const checkPremiumStatus = async () => {
       try {
@@ -155,16 +158,40 @@ function PlayPageContent() {
           if (typeof data.isPremium === 'boolean') {
             setIsPremiumUser(data.isPremium);
             setAdFreeEnabled(data.isPremium);
+            setIsVipUser(data.isPremium);
           }
-          // Otherwise keep the default true values for testing
         }
-        // If API fails, keep default true values
       } catch {
-        // Keep default true values for testing
+        // Keep default values
       }
     };
     checkPremiumStatus();
   }, []);
+
+  // Fetch user's unlocked episodes for this VOD
+  useEffect(() => {
+    if (!vod || !isAuthenticated) return;
+
+    const fetchUnlockedEpisodes = async () => {
+      try {
+        // Get all unlocked content for this user
+        const response = await fetch(`/api/user/unlocked?pageSize=100&category=${sourceCategory}`);
+        if (response.ok) {
+          const result = await response.json();
+          // Filter for current VOD and extract episode indices
+          const vodUnlocks = result.data?.filter(
+            (item: { vodId: number }) => item.vodId === vod.vod_id
+          ) || [];
+          const episodes = new Set<number>(vodUnlocks.map((item: { episodeIndex: number }) => item.episodeIndex));
+          setUnlockedEpisodes(episodes);
+        }
+      } catch (err) {
+        console.error('Failed to fetch unlocked episodes:', err);
+      }
+    };
+
+    fetchUnlockedEpisodes();
+  }, [vod, isAuthenticated, sourceCategory]);
 
   // Fetch watch history to check for resume position
   useEffect(() => {
@@ -283,7 +310,41 @@ function PlayPageContent() {
     setShowResumePrompt(false);
   };
 
-  const handleEpisodeSelect = (sourceIndex: number, episodeIndex: number) => {
+  // Check if a specific episode is accessible
+  const isEpisodeUnlocked = useCallback((episodeIndex: number): boolean => {
+    // VIP users have access to all content
+    if (isVipUser) return true;
+    // Check if this specific episode is unlocked
+    return unlockedEpisodes.has(episodeIndex);
+  }, [isVipUser, unlockedEpisodes]);
+
+  const handleEpisodeSelect = async (sourceIndex: number, episodeIndex: number) => {
+    // Check if episode is unlocked (VIP or purchased)
+    const episodeUnlocked = isEpisodeUnlocked(episodeIndex);
+
+    if (!episodeUnlocked) {
+      // Episode is locked - check access to show unlock modal
+      const result = await checkAccess(vod!.vod_id, episodeIndex, sourceCategory);
+      if (result && !result.hasAccess) {
+        // Update state for the new episode
+        setSelectedSourceIndex(sourceIndex);
+        setSelectedEpisodeIndex(episodeIndex);
+        setContentPrice(result.price ?? 0);
+        setHasAccess(false);
+        setAccessType('locked');
+        setShowUnlockModal(true);
+        setShowEpisodeList(false);
+
+        // Update URL
+        const url = new URL(window.location.href);
+        url.searchParams.set('source', sourceIndex.toString());
+        url.searchParams.set('ep', episodeIndex.toString());
+        window.history.replaceState({}, '', url.toString());
+        return;
+      }
+    }
+
+    // Episode is unlocked - proceed with playback
     setSelectedSourceIndex(sourceIndex);
     setSelectedEpisodeIndex(episodeIndex);
     setInitialPosition(0);
@@ -596,18 +657,33 @@ function PlayPageContent() {
             {/* Episode Grid */}
             <div className="p-4 overflow-y-auto max-h-[50vh]">
               <div className="grid grid-cols-4 gap-2">
-                {currentSource?.episodes.map((episode, index) => (
-                  <button
-                    key={`${episode.name}-${index}`}
-                    onClick={() => handleEpisodeSelect(selectedSourceIndex, index)}
-                    className={`px-3 py-2 text-sm rounded-lg truncate ${selectedEpisodeIndex === index
-                      ? 'bg-primary text-white'
-                      : 'bg-surface text-foreground/70 hover:bg-surface-secondary'
-                      }`}
-                  >
-                    {episode.name}
-                  </button>
-                ))}
+                {currentSource?.episodes.map((episode, index) => {
+                  const episodeUnlocked = isEpisodeUnlocked(index);
+                  const isSelected = selectedEpisodeIndex === index;
+
+                  return (
+                    <button
+                      key={`${episode.name}-${index}`}
+                      onClick={() => handleEpisodeSelect(selectedSourceIndex, index)}
+                      className={`relative px-3 py-2 text-sm rounded-lg truncate ${isSelected
+                        ? 'bg-primary text-white'
+                        : episodeUnlocked
+                          ? 'bg-surface text-foreground/70 hover:bg-surface-secondary'
+                          : 'bg-surface text-foreground/50 hover:bg-surface-secondary'
+                        }`}
+                    >
+                      {episode.name}
+                      {/* Lock icon for locked episodes */}
+                      {!episodeUnlocked && !isSelected && (
+                        <span className="absolute top-0.5 right-0.5">
+                          <svg className="w-3 h-3 text-amber-500" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z" />
+                          </svg>
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
