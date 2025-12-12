@@ -34,6 +34,7 @@ const poolConfig: PoolConfig = {
 
 const globalForPool = globalThis as unknown as {
   pool: Pool | undefined;
+  poolEnded: boolean | undefined;
 };
 
 // 只在 Node.js 环境创建连接池
@@ -45,11 +46,16 @@ if (process.env.NODE_ENV !== 'production' && !isEdgeRuntime) {
 }
 
 // Graceful shutdown handling (Requirement 4.4)
-if (!isEdgeRuntime) {
+// Track if pool has been ended to prevent "Called end on pool more than once" error
+if (!isEdgeRuntime && !globalForPool.poolEnded) {
   const shutdown = async () => {
-    await pool?.end();
+    if (!globalForPool.poolEnded && pool) {
+      globalForPool.poolEnded = true;
+      await pool.end();
+    }
   };
 
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);
 }
+
