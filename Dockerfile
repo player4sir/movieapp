@@ -21,6 +21,23 @@ COPY . .
 # Uncomment the following line in case you want to disable telemetry during the build.
 ENV NEXT_TELEMETRY_DISABLED 1
 
+# Build-time environment variables (dummy values for CI/CD builds)
+# These allow the build to complete without a real database connection
+# Runtime values should be provided via docker run -e or docker-compose
+ARG DATABASE_URL=postgres://build:build@localhost:5432/build
+ARG JWT_SECRET=build-jwt-secret-must-be-at-least-32-characters
+ARG JWT_REFRESH_SECRET=build-refresh-secret
+ARG NEXTAUTH_SECRET=build-nextauth-secret
+ARG VIDEO_API_URL=http://localhost:8080
+ARG PLAYBACK_TOKEN_SECRET=build-playback-secret-at-least-32-chars
+
+ENV DATABASE_URL=$DATABASE_URL
+ENV JWT_SECRET=$JWT_SECRET
+ENV JWT_REFRESH_SECRET=$JWT_REFRESH_SECRET
+ENV NEXTAUTH_SECRET=$NEXTAUTH_SECRET
+ENV VIDEO_API_URL=$VIDEO_API_URL
+ENV PLAYBACK_TOKEN_SECRET=$PLAYBACK_TOKEN_SECRET
+
 RUN npm run build
 
 # Production image, copy all the files and run next
