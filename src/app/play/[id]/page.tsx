@@ -46,7 +46,7 @@ function PlayPageContent() {
     ? sourceCategoryParam as SourceCategory
     : 'normal'; // Default to normal if not specified
 
-  const { data: vod, loading, error } = useVODDetail(id, { sourceCategory });
+  const { data: vod, loading, error, refresh } = useVODDetail(id, { sourceCategory });
 
   // Auth hook for login check
   const { isAuthenticated, loading: authLoading } = useAuth();
@@ -257,8 +257,11 @@ function PlayPageContent() {
 
       // Invalidate cache for this content
       invalidateCache(vod.vod_id, selectedEpisodeIndex);
+
+      // Refresh VOD data to get new tokens with full access (non-preview)
+      await refresh();
     }
-  }, [vod, selectedEpisodeIndex, sourceCategory, unlockContent, invalidateCache]);
+  }, [vod, selectedEpisodeIndex, sourceCategory, unlockContent, invalidateCache, refresh]);
 
   // Save progress on unmount
   useEffect(() => {

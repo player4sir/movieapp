@@ -47,10 +47,13 @@ export function useVODList(options: UseVODListOptions = {}): UseVODListResult {
   const { pageSize = 20, typeId, hours, sourceCategory } = options;
 
   // Use SWR Infinite for pagination with caching
-  const getKey = useCallback((pageIndex: number, previousPageData: { list?: VODItem[] } | null) => {
-    // Reached the end
-    if (previousPageData && (!previousPageData.list || previousPageData.list.length === 0)) {
-      return null;
+  const getKey = useCallback((pageIndex: number, previousPageData: { list?: VODItem[]; data?: VODItem[] } | null) => {
+    // Reached the end - check both 'list' and 'data' fields as API response format varies
+    if (previousPageData) {
+      const items = previousPageData.list || previousPageData.data;
+      if (!items || items.length === 0) {
+        return null;
+      }
     }
     return buildVODListUrl(pageIndex, pageSize, typeId, hours, sourceCategory);
   }, [pageSize, typeId, hours, sourceCategory]);
@@ -127,7 +130,7 @@ export function useCategories(options: UseCategoriesOptions = {}): UseCategories
 
   const queryString = params.toString();
   const url = `/api/vod/categories${queryString ? `?${queryString}` : ''}`;
-  
+
   // Categories rarely change - use long cache with background refresh
   const { data, error, isLoading, mutate } = useSWR<{ data: Category[] }>(url, globalFetcher, swrConfigs.categories);
 
