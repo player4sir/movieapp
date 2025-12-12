@@ -51,7 +51,7 @@ export function ReferralStats() {
     if (loading) return <div className="p-8 text-center text-white/60">加载中...</div>;
     if (!user || !user.referralCode) return <div className="p-8 text-center text-white/60">无法获取推广信息</div>;
 
-    const shareLink = `${window.location.origin}/register?ref=${user.referralCode}`;
+    const shareLink = `${window.location.origin}/auth/register?ref=${user.referralCode}`;
     const inviterReward = stats?.rewards?.inviter ?? 50;
     const inviteeReward = stats?.rewards?.invitee ?? 10;
 
