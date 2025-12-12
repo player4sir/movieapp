@@ -61,7 +61,8 @@ function RegisterPageContent() {
     }
 
     // Auto-fill invite code from URL or localStorage
-    const codeFromUrl = searchParams.get('invite');
+    // Support both 'ref' (from share link) and 'invite' parameters
+    const codeFromUrl = searchParams.get('ref') || searchParams.get('invite');
     const codeFromStorage = localStorage.getItem('referralCode');
 
     if (codeFromUrl) {
