@@ -22,6 +22,10 @@ export const dynamic = 'force-dynamic';
 // 移动端使用更长的超时时间（Requirements: 2.4）
 const FETCH_TIMEOUT = 20000; // 20秒
 
+// Cloudflare Worker 代理 URL（用于绕过 403 限制）
+const CF_WORKER_PROXY_URL = process.env.VIDEO_PROXY_WORKER_URL || 'https://video-proxy.player4sir.workers.dev';
+const CF_WORKER_SECRET = process.env.VIDEO_PROXY_WORKER_SECRET || '';
+
 /**
  * 解析URL中的相对路径，返回绝对URL
  * 支持多种相对路径格式：
@@ -33,23 +37,23 @@ const FETCH_TIMEOUT = 20000; // 20秒
  */
 function resolveUrl(urlStr: string, baseUrl: string, origin: string): string {
   const trimmed = urlStr.trim();
-  
+
   // 已经是绝对URL
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
     return trimmed;
   }
-  
+
   // 绝对路径（以/开头）
   if (trimmed.startsWith('/')) {
     return origin + trimmed;
   }
-  
+
   // 处理 ./ 开头的相对路径
   let relativePath = trimmed;
   if (relativePath.startsWith('./')) {
     relativePath = relativePath.substring(2);
   }
-  
+
   // 处理 ../ 开头的相对路径
   if (relativePath.startsWith('../')) {
     try {
@@ -59,7 +63,7 @@ function resolveUrl(urlStr: string, baseUrl: string, origin: string): string {
       return baseUrl + relativePath;
     }
   }
-  
+
   // 普通相对路径
   return baseUrl + relativePath;
 }
@@ -77,7 +81,7 @@ export async function GET(request: NextRequest) {
     if (token) {
       const payload = verifyPlaybackToken(token);
       if (!payload) {
-        console.error('[M3U8 Proxy] Token verification failed', { 
+        console.error('[M3U8 Proxy] Token verification failed', {
           tokenLength: token.length,
           tokenPrefix: token.substring(0, 20) + '...',
         });
@@ -139,6 +143,7 @@ export async function GET(request: NextRequest) {
 
     let response: Response | null = null;
     let lastError: Error | null = null;
+    let usedWorkerProxy = false;
 
     // Try different combinations of User-Agent and Referer
     outer: for (const userAgent of userAgents) {
@@ -153,7 +158,7 @@ export async function GET(request: NextRequest) {
             'Accept': '*/*',
             'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
           };
-          
+
           // Only add Referer if not empty
           if (referer) {
             headers['Referer'] = referer;
@@ -179,6 +184,37 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // If response is 403, try Cloudflare Worker proxy as fallback
+    if (response && response.status === 403 && CF_WORKER_PROXY_URL) {
+      console.log('[M3U8 Proxy] Got 403, trying Cloudflare Worker fallback...');
+      try {
+        const workerUrl = new URL('/proxy', CF_WORKER_PROXY_URL);
+        workerUrl.searchParams.set('url', decodedUrl);
+        if (CF_WORKER_SECRET) {
+          workerUrl.searchParams.set('key', CF_WORKER_SECRET);
+        }
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
+
+        response = await fetch(workerUrl.toString(), {
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          usedWorkerProxy = true;
+          console.log('[M3U8 Proxy] Cloudflare Worker fallback succeeded');
+        } else {
+          console.error('[M3U8 Proxy] Cloudflare Worker fallback failed:', response.status);
+        }
+      } catch (err) {
+        console.error('[M3U8 Proxy] Cloudflare Worker fallback error:', err);
+        // Keep the original 403 response
+      }
+    }
+
     if (!response) {
       throw lastError || new Error('All referer attempts failed');
     }
@@ -197,7 +233,7 @@ export async function GET(request: NextRequest) {
       // 使用重定向后的最终URL作为基础URL（Requirements: 2.5）
       const finalUrl = response.url || decodedUrl;
       const baseUrl = finalUrl.substring(0, finalUrl.lastIndexOf('/') + 1);
-      
+
       // 解析最终URL以获取origin
       let finalOrigin: string;
       try {
@@ -287,14 +323,14 @@ export async function GET(request: NextRequest) {
         const absoluteUrl = resolveUrl(trimmedLine, baseUrl, finalOrigin);
 
         // 代理.ts分段
-        if (trimmedLine.endsWith('.ts') || trimmedLine.includes('.ts?') || 
-            trimmedLine.includes('.ts#') || /\.ts\b/.test(trimmedLine)) {
+        if (trimmedLine.endsWith('.ts') || trimmedLine.includes('.ts?') ||
+          trimmedLine.includes('.ts#') || /\.ts\b/.test(trimmedLine)) {
           return `/api/proxy/ts?url=${encodeURIComponent(absoluteUrl)}`;
         }
 
         // 代理嵌套的m3u8文件
         if (trimmedLine.endsWith('.m3u8') || trimmedLine.includes('.m3u8?') ||
-            trimmedLine.includes('.m3u8#') || /\.m3u8\b/.test(trimmedLine)) {
+          trimmedLine.includes('.m3u8#') || /\.m3u8\b/.test(trimmedLine)) {
           const adFreeParam = adFree ? '&adFree=true' : '';
           const subToken = generatePlaybackToken({
             url: absoluteUrl,

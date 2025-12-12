@@ -1,0 +1,16 @@
+name = "video-proxy"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+# Workers 配置
+[vars]
+# 可选：设置代理密钥防止滥用
+# PROXY_SECRET = "your-secret-key"
+
+# 可选：限制允许代理的域名（逗号分隔）
+# ALLOWED_DOMAINS = "example1.com,example2.com"
+
+# 路由配置（可选，用于自定义域名）
+# [[routes]]
+# pattern = "video-proxy.yourdomain.com/*"
+# zone_name = "yourdomain.com"
