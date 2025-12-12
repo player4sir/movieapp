@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { AdminAuthProvider, useAdminAuth } from '@/contexts/AdminAuthContext';
-import { AdminSidebar, AdminBottomNav } from '@/components/admin';
+import { AdminSidebar, AdminBottomNav, ToastProvider } from '@/components/admin';
 import { setupGlobalFetchInterceptor } from '@/lib/api-client';
 
 /**
@@ -24,7 +24,9 @@ export default function AdminLayout({
 
   return (
     <AdminAuthProvider>
-      <AdminLayoutContent>{children}</AdminLayoutContent>
+      <ToastProvider>
+        <AdminLayoutContent>{children}</AdminLayoutContent>
+      </ToastProvider>
     </AdminAuthProvider>
   );
 }
@@ -64,7 +66,7 @@ function AdminLayoutContent({
     }
 
     if (authState !== 'authorized') setAuthState('authorized');
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, isAuthenticated, user?.role, isLoginPage]);
 
   // Close sidebar on route change
@@ -99,9 +101,9 @@ function AdminLayoutContent({
     <div className="min-h-screen min-h-[100dvh] bg-background">
       {/* Sidebar (desktop always visible, mobile as drawer) */}
       <AdminSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      
+
       {/* Header with safe area for notch */}
-      <header 
+      <header
         className="fixed top-0 left-0 right-0 lg:left-64 bg-surface border-b border-surface-secondary z-30"
         style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
@@ -118,11 +120,11 @@ function AdminLayoutContent({
           <div className="lg:hidden" />
         </div>
       </header>
-      
+
       {/* Main content with safe area padding */}
-      <main 
+      <main
         className="lg:ml-64 min-h-screen min-h-[100dvh]"
-        style={{ 
+        style={{
           paddingTop: 'calc(3.5rem + env(safe-area-inset-top))',
           paddingBottom: 'calc(5rem + env(safe-area-inset-bottom))',
         }}
