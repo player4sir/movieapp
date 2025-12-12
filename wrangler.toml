@@ -7,7 +7,7 @@
 # 1. 在 Neon 创建 PostgreSQL 数据库
 # 2. 在 Cloudflare Pages 设置环境变量 DATABASE_URL
 # 3. 连接 GitHub 仓库到 Cloudflare Pages
-# 4. 设置构建命令: npm run build:cf
+# 4. 设置构建命令: npm run pages:build
 # 5. 设置输出目录: .vercel/output/static
 
 name = "movie-app"

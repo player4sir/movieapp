@@ -1,9 +1,18 @@
 name: Deploy to Cloudflare Pages
 
+# Manual trigger only - to avoid conflicts with Vercel deployment
+# Use this workflow when deploying to Cloudflare Pages instead of Vercel
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - preview
 
 jobs:
   deploy:

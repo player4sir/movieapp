@@ -340,3 +340,243 @@ npm run build
 
 - 启用 Cloudflare CDN
 - 配置 Page Rules 缓存静态资源
+
+---
+
+## 数据库迁移时机
+
+### Docker 部署
+
+```bash
+# 方式 1: 容器外迁移 (推荐首次部署)
+export DATABASE_URL=postgres://...
+npm run db:push
+
+# 然后启动容器
+docker-compose up -d
+
+# 方式 2: 容器内迁移
+docker-compose up -d
+docker exec -it movie-app npm run db:push
+```
+
+### Vercel/Cloudflare
+
+在部署前本地执行迁移：
+
+```bash
+# 设置生产数据库 URL
+export DATABASE_URL=你的生产数据库连接字符串
+
+# 执行迁移
+npm run db:push
+```
+
+---
+
+## 回滚流程
+
+### Docker 回滚
+
+```bash
+# 1. 查看历史镜像
+docker images movie-app
+
+# 2. 停止当前容器
+docker-compose down
+
+# 3. 使用旧版本镜像启动
+docker run -d --name movie-app \
+  -e DATABASE_URL=... \
+  movie-app:previous-tag
+
+# 或者使用 Git 回滚
+git checkout <previous-commit>
+docker-compose up -d --build
+```
+
+### Vercel 回滚
+
+1. 访问 Vercel Dashboard > Deployments
+2. 找到需要回滚到的部署版本
+3. 点击 "..." > "Promote to Production"
+
+### Cloudflare Pages 回滚
+
+1. 访问 Cloudflare Dashboard > Pages > 你的项目
+2. 进入 Deployments 标签
+3. 找到目标部署，点击 "Rollback to this deploy"
+
+---
+
+## 监控建议
+
+### 推荐监控工具
+
+| 工具 | 用途 | 免费额度 |
+|------|------|---------|
+| [Sentry](https://sentry.io) | 错误追踪 | 5K events/月 |
+| [Logtail](https://logtail.com) | 日志收集 | 1GB/月 |
+| [Uptime Robot](https://uptimerobot.com) | 可用性监控 | 50个监控点 |
+| [Vercel Analytics](https://vercel.com/analytics) | 性能监控 | Vercel 内置 |
+
+### 健康检查端点
+
+应用提供 `/api/health` 端点用于监控：
+
+```bash
+curl https://your-domain.com/api/health
+
+# 返回示例
+{
+  "status": "healthy",
+  "timestamp": "2024-12-13T00:00:00.000Z",
+  "uptime": 12345.678,
+  "database": "connected",
+  "responseTime": "5ms"
+}
+```
+
+### 设置告警
+
+**Uptime Robot 配置：**
+
+1. 添加 HTTP(s) 监控
+2. URL: `https://your-domain.com/api/health`
+3. 监控间隔: 5 分钟
+4. 配置电子邮件/Slack 告警
+
+---
+
+## 备份策略
+
+### 数据库备份
+
+**Neon (推荐)：**
+
+- 自动持续备份，每日快照
+- 可通过 Dashboard 或 CLI 恢复
+
+**自托管 PostgreSQL：**
+
+```bash
+# 每日备份脚本
+#!/bin/bash
+BACKUP_DIR=/backups
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+
+pg_dump $DATABASE_URL > $BACKUP_DIR/movieshell_$TIMESTAMP.sql
+
+# 保留最近 7 天的备份
+find $BACKUP_DIR -name "*.sql" -mtime +7 -delete
+```
+
+**添加到 crontab：**
+
+```bash
+# 每天凌晨 3 点备份
+0 3 * * * /path/to/backup.sh
+```
+
+### 恢复数据库
+
+```bash
+# 从备份恢复
+psql $DATABASE_URL < backup_file.sql
+
+# 或使用 Neon Dashboard 的时间点恢复功能
+```
+
+---
+
+## 扩展指南
+
+### 水平扩展 (Docker)
+
+```yaml
+# docker-compose.scale.yml
+version: '3.8'
+
+services:
+  app:
+    build: .
+    deploy:
+      replicas: 3
+      
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - app
+```
+
+**nginx.conf 负载均衡示例：**
+
+```nginx
+upstream app_servers {
+    server app:3000;
+}
+
+server {
+    listen 80;
+    
+    location / {
+        proxy_pass http://app_servers;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+### Vercel 扩展
+
+- 自动按需扩展
+- 配置 `functions.maxDuration` 调整超时
+- 使用 Edge Functions 降低延迟
+
+### Cloudflare 扩展
+
+- 全球边缘节点自动扩展
+- 启用 Smart Routing
+- 配置 Workers 处理复杂计算
+
+---
+
+## 安全加固
+
+### HTTPS 配置
+
+**Docker 部署需要添加反向代理：**
+
+```yaml
+# docker-compose.prod.yml
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./certs:/etc/nginx/certs
+    depends_on:
+      - app
+```
+
+**Vercel/Cloudflare：** HTTPS 已自动配置。
+
+### 安全检查清单
+
+- [ ] 所有环境变量已正确设置 (无默认值)
+- [ ] DATABASE_URL 使用 SSL 连接 (`?sslmode=require`)
+- [ ] JWT_SECRET 至少 32 个字符
+- [ ] 启用了 Rate Limiting
+- [ ] 定期更新依赖 (`npm audit`)
+- [ ] 配置了监控和告警
+
