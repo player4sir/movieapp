@@ -244,35 +244,8 @@ export async function GET(request: NextRequest) {
 
       let processedContent = content;
 
-      // 预览模式截断逻辑（3分钟）
-      if (isPreview) {
-        try {
-          const lines = content.split('\n');
-          const truncatedLines: string[] = [];
-          let currentDuration = 0;
-          const MAX_PREVIEW_DURATION = 180; // 3分钟
-
-          for (let i = 0; i < lines.length; i++) {
-            const line = lines[i].trim();
-            if (line.startsWith('#EXTINF:')) {
-              const match = line.match(/#EXTINF:([\d.]+)/);
-              if (match) {
-                const segDuration = parseFloat(match[1]);
-                if (currentDuration + segDuration > MAX_PREVIEW_DURATION) {
-                  break;
-                }
-                currentDuration += segDuration;
-              }
-            }
-            truncatedLines.push(lines[i]);
-          }
-
-          truncatedLines.push('#EXT-X-ENDLIST');
-          processedContent = truncatedLines.join('\n');
-        } catch (e) {
-          console.error('[M3U8 Proxy] Truncation error:', e);
-        }
-      }
+      // Note: Preview mode truncation has been removed.
+      // All authenticated users with access get full content.
 
       // 广告过滤
       let adFilterStats = { filtered: 0, total: 0 };
@@ -308,7 +281,7 @@ export async function GET(request: NextRequest) {
             const absoluteUri = resolveUrl(uri, baseUrl, finalOrigin);
             const keyToken = generatePlaybackToken({
               url: absoluteUri,
-              isPreview: isPreview
+              isPreview: false
             });
             return `URI="/api/proxy/m3u8?token=${keyToken}"`;
           });
@@ -334,7 +307,7 @@ export async function GET(request: NextRequest) {
           const adFreeParam = adFree ? '&adFree=true' : '';
           const subToken = generatePlaybackToken({
             url: absoluteUrl,
-            isPreview: isPreview
+            isPreview: false
           });
           return `/api/proxy/m3u8?token=${subToken}${adFreeParam}`;
         }
@@ -359,10 +332,6 @@ export async function GET(request: NextRequest) {
       if (adFree && adFilterStats.filtered > 0) {
         responseHeaders['X-Ad-Filter-Total'] = adFilterStats.total.toString();
         responseHeaders['X-Ad-Filter-Removed'] = adFilterStats.filtered.toString();
-      }
-
-      if (isPreview) {
-        responseHeaders['X-Preview-Mode'] = 'true';
       }
 
       return new NextResponse(rewrittenContent, {

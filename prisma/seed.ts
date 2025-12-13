@@ -46,7 +46,7 @@ const DEFAULT_AD_SLOTS = [
   { name: '个人中心底部', position: 'profile_bottom', width: 728, height: 90, rotationStrategy: 'random' as const, sortOrder: 6 },
 ];
 
-// Default paywall configuration (Requirements 1.2, 1.3, 1.4)
+// Default paywall configuration (Requirements 1.2, 1.3)
 const PAYWALL_CONFIGS = [
   {
     key: 'paywall_normal_price',
@@ -57,11 +57,6 @@ const PAYWALL_CONFIGS = [
     key: 'paywall_adult_price',
     value: 10,
     description: '成人内容每集价格（金币）',
-  },
-  {
-    key: 'paywall_preview_duration',
-    value: 180,
-    description: '试看时长（秒）',
   },
   {
     key: 'paywall_enabled',

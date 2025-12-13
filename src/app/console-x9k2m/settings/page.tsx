@@ -96,7 +96,7 @@ export default function AdminSettingsPage() {
           <SettingCard
             href="/console-x9k2m/settings/paywall"
             title="付费墙配置"
-            description="管理内容定价策略、非会员试看时长及 VIP 权益开关。"
+            description="管理内容定价策略及 VIP 权益开关。"
             iconBgColor="bg-purple-500/10"
             iconColor="text-purple-500"
             icon={

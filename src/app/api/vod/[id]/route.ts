@@ -84,7 +84,9 @@ export async function GET(
       try {
         // Check generic access (episode 0 is usually representative for "is VIP" check)
         const baseAccess = await checkAccess(userId, vodId, 0, sourceCategory || 'normal');
-        if (baseAccess.accessType === 'vip' || baseAccess.accessType === 'free') {
+        // Use the hasAccess property from checkAccess result to properly handle all access types
+        // including 'vip', 'free', and 'purchased'
+        if (baseAccess.hasAccess) {
           hasAccess = true;
         }
       } catch {
@@ -102,13 +104,15 @@ export async function GET(
     if (userId) {
       try {
         const baseCheck = await checkAccess(userId, vodId, 0, sourceCategory || 'normal');
-        if (baseCheck.accessType === 'vip') {
+        // Use hasAccess to properly handle all access types (vip, free, purchased)
+        if (baseCheck.hasAccess) {
           hasAccess = true;
-        } else {
-          const { getUnlockedEpisodes } = await import('@/services/access.service');
-          const unlocked = await getUnlockedEpisodes(userId, vodId);
-          unlocked.forEach(r => unlockedIndices.add(r.episodeIndex));
         }
+        // Always load unlocked episodes to handle per-episode purchases
+        // even if user has full access (to properly mark individual episodes)
+        const { getUnlockedEpisodes } = await import('@/services/access.service');
+        const unlocked = await getUnlockedEpisodes(userId, vodId);
+        unlocked.forEach(r => unlockedIndices.add(r.episodeIndex));
       } catch {
         // ignore
       }

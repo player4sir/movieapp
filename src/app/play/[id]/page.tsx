@@ -85,7 +85,9 @@ function PlayPageContent() {
   // 开发阶段默认开启广告过滤，方便测试
   const [adFreeEnabled, setAdFreeEnabled] = useState(true);
   const [isPremiumUser, setIsPremiumUser] = useState(true);
-  const [isVipUser, setIsVipUser] = useState(false);
+  // VIP/SVIP 状态
+  const [isVipUser, setIsVipUser] = useState(false);  // VIP: normal content only
+  const [isSvipUser, setIsSvipUser] = useState(false); // SVIP: all content
 
   // Paywall state
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
@@ -154,11 +156,17 @@ function PlayPageContent() {
         const response = await fetch('/api/user/subscription');
         if (response.ok) {
           const data = await response.json();
-          // Only update if we get a definitive response
+          // Update premium status
           if (typeof data.isPremium === 'boolean') {
             setIsPremiumUser(data.isPremium);
             setAdFreeEnabled(data.isPremium);
-            setIsVipUser(data.isPremium);
+          }
+          // Update VIP/SVIP status
+          if (typeof data.isVip === 'boolean') {
+            setIsVipUser(data.isVip);
+          }
+          if (typeof data.isSvip === 'boolean') {
+            setIsSvipUser(data.isSvip);
           }
         }
       } catch {
@@ -311,12 +319,16 @@ function PlayPageContent() {
   };
 
   // Check if a specific episode is accessible
+  // VIP: can access normal content for free
+  // SVIP: can access all content for free
   const isEpisodeUnlocked = useCallback((episodeIndex: number): boolean => {
-    // VIP users have access to all content
-    if (isVipUser) return true;
-    // Check if this specific episode is unlocked
+    // SVIP users have access to ALL content (normal + adult)
+    if (isSvipUser) return true;
+    // VIP users only have access to normal content
+    if (isVipUser && sourceCategory === 'normal') return true;
+    // Check if this specific episode is purchased/unlocked
     return unlockedEpisodes.has(episodeIndex);
-  }, [isVipUser, unlockedEpisodes]);
+  }, [isVipUser, isSvipUser, sourceCategory, unlockedEpisodes]);
 
   const handleEpisodeSelect = async (sourceIndex: number, episodeIndex: number) => {
     // Check if episode is unlocked (VIP or purchased)

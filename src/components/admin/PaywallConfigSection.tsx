@@ -24,7 +24,6 @@ export interface PaywallConfigSectionProps {
 const CONFIG_LABELS: Record<string, string> = {
   paywall_normal_price: '普通内容价格',
   paywall_adult_price: '成人内容价格',
-  paywall_preview_duration: '试看时长',
   paywall_enabled: '付费墙开关',
 };
 
@@ -34,7 +33,6 @@ const CONFIG_LABELS: Record<string, string> = {
 const CONFIG_UNITS: Record<string, string> = {
   paywall_normal_price: '金币/集',
   paywall_adult_price: '金币/集',
-  paywall_preview_duration: '秒',
   paywall_enabled: '',
 };
 
@@ -66,18 +64,18 @@ export function PaywallConfigSection({ onShowToast }: PaywallConfigSectionProps)
   const fetchConfigs = useCallback(async () => {
     setLoading(true);
     setError(null);
-    
+
     const { data, error: apiError } = await api.get<{ configs: Record<string, PaywallConfigValue> }>(
       '/api/admin/paywall/config'
     );
-    
+
     // 401 会自动跳转到登录页，这里只处理其他错误
     if (apiError) {
       setError(apiError);
     } else if (data) {
       setConfigs(data.configs || {});
     }
-    
+
     setLoading(false);
   }, []);
 
@@ -109,7 +107,7 @@ export function PaywallConfigSection({ onShowToast }: PaywallConfigSectionProps)
     setSaving(true);
     try {
       let parsedValue: unknown;
-      
+
       if (key === 'paywall_enabled') {
         parsedValue = editValue === 'true';
       } else {
@@ -118,12 +116,12 @@ export function PaywallConfigSection({ onShowToast }: PaywallConfigSectionProps)
           throw new Error('请输入有效的数字');
         }
       }
-      
+
       const { error: apiError } = await api.put(
         '/api/admin/paywall/config',
         { key, value: parsedValue }
       );
-      
+
       // 401 会自动跳转到登录页
       if (apiError) {
         throw new Error(apiError);
@@ -150,7 +148,7 @@ export function PaywallConfigSection({ onShowToast }: PaywallConfigSectionProps)
         '/api/admin/paywall/config',
         { key, value: !currentValue }
       );
-      
+
       // 401 会自动跳转到登录页
       if (apiError) {
         throw new Error(apiError);
@@ -214,13 +212,13 @@ export function PaywallConfigSection({ onShowToast }: PaywallConfigSectionProps)
         <PaywallIcon />
         付费墙配置
       </h2>
-      
+
       <div className="space-y-3">
         {configKeys.map((key) => {
           const config = configs[key];
           const isBoolean = key === 'paywall_enabled';
           const isEditing = editingKey === key;
-          
+
           return (
             <div key={key} className="p-3 bg-surface-secondary/30 rounded-lg">
               <div className="flex items-start justify-between gap-3">
@@ -231,7 +229,7 @@ export function PaywallConfigSection({ onShowToast }: PaywallConfigSectionProps)
                     </span>
                   </div>
                   <p className="text-xs text-foreground/50 mb-2">{config.description}</p>
-                  
+
                   {isEditing && !isBoolean ? (
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
@@ -269,19 +267,17 @@ export function PaywallConfigSection({ onShowToast }: PaywallConfigSectionProps)
                     </p>
                   )}
                 </div>
-                
+
                 {isBoolean ? (
                   <button
                     onClick={() => handleToggle(key, config.value as boolean)}
                     disabled={saving}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      config.value ? 'bg-primary' : 'bg-surface-secondary'
-                    } ${saving ? 'opacity-50' : ''}`}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${config.value ? 'bg-primary' : 'bg-surface-secondary'
+                      } ${saving ? 'opacity-50' : ''}`}
                   >
                     <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        config.value ? 'translate-x-6' : 'translate-x-1'
-                      }`}
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.value ? 'translate-x-6' : 'translate-x-1'
+                        }`}
                     />
                   </button>
                 ) : !isEditing && (
@@ -297,7 +293,7 @@ export function PaywallConfigSection({ onShowToast }: PaywallConfigSectionProps)
           );
         })}
       </div>
-      
+
       <p className="text-xs text-foreground/40 mt-4">
         提示：修改配置后将立即生效，请谨慎操作
       </p>

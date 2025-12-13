@@ -115,8 +115,8 @@ async function handleProxy(request: Request, url: URL, env: Env): Promise<Respon
     });
 
     try {
-        // 发送请求到源站
-        const response = await fetch(proxyRequest);
+        // 使用多策略重试发送请求到源站
+        const response = await fetchWithRetry(targetUrl, parsedTarget);
 
         // 检查响应状态
         if (!response.ok) {
@@ -155,13 +155,13 @@ async function handleProxy(request: Request, url: URL, env: Env): Promise<Respon
 }
 
 /**
- * 构建代理请求头
+ * 构建代理请求头 - 模拟真实浏览器请求
  */
 function buildProxyHeaders(originalRequest: Request, targetUrl: URL): Headers {
     const headers = new Headers();
 
     // 复制必要的请求头
-    const headersToForward = ['Range', 'Accept', 'Accept-Encoding', 'Accept-Language'];
+    const headersToForward = ['Range', 'Accept-Encoding'];
     for (const header of headersToForward) {
         const value = originalRequest.headers.get(header);
         if (value) {
@@ -169,21 +169,81 @@ function buildProxyHeaders(originalRequest: Request, targetUrl: URL): Headers {
         }
     }
 
-    // 设置合适的请求头以避免 403
+    // 模拟完整的浏览器请求头
     headers.set('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    headers.set('Accept', '*/*');
+    headers.set('Accept-Language', 'zh-CN,zh;q=0.9,en;q=0.8');
     headers.set('Referer', targetUrl.origin + '/');
     headers.set('Origin', targetUrl.origin);
     headers.set('Host', targetUrl.host);
-
-    // 移除可能暴露代理的头
-    headers.delete('CF-Connecting-IP');
-    headers.delete('CF-IPCountry');
-    headers.delete('CF-RAY');
-    headers.delete('CF-Visitor');
-    headers.delete('X-Forwarded-For');
-    headers.delete('X-Forwarded-Proto');
+    headers.set('Sec-Ch-Ua', '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"');
+    headers.set('Sec-Ch-Ua-Mobile', '?0');
+    headers.set('Sec-Ch-Ua-Platform', '"Windows"');
+    headers.set('Sec-Fetch-Dest', 'empty');
+    headers.set('Sec-Fetch-Mode', 'cors');
+    headers.set('Sec-Fetch-Site', 'same-origin');
 
     return headers;
+}
+
+/**
+ * 尝试不同的请求策略
+ */
+async function fetchWithRetry(targetUrl: string, parsedTarget: URL): Promise<Response> {
+    const strategies: Record<string, string>[] = [
+        // 策略1: 完整浏览器头
+        {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': '*/*',
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+            'Referer': parsedTarget.origin + '/',
+            'Origin': parsedTarget.origin,
+            'Host': parsedTarget.host,
+        },
+        // 策略2: 移动端 UA
+        {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+            'Accept': '*/*',
+            'Accept-Language': 'zh-CN,zh;q=0.9',
+            'Referer': parsedTarget.origin + '/',
+            'Host': parsedTarget.host,
+        },
+        // 策略3: 播放器 UA (无 Referer)
+        {
+            'User-Agent': 'AptvPlayer/1.4.10',
+            'Accept': '*/*',
+            'Host': parsedTarget.host,
+        },
+        // 策略4: 最小化头
+        {
+            'User-Agent': 'Dalvik/2.1.0 (Linux; U; Android 12; Pixel 6 Build/SD1A.210817.023)',
+            'Host': parsedTarget.host,
+        },
+    ];
+
+    let lastResponse: Response | null = null;
+
+    for (const headers of strategies) {
+        try {
+            const response = await fetch(targetUrl, { headers });
+
+            if (response.ok) {
+                return response;
+            }
+
+            lastResponse = response;
+
+            // 如果不是 403，直接返回
+            if (response.status !== 403) {
+                return response;
+            }
+        } catch (err) {
+            console.error('Fetch attempt failed:', err);
+        }
+    }
+
+    // 返回最后一次响应或创建错误响应
+    return lastResponse || new Response('All strategies failed', { status: 502 });
 }
 
 /**

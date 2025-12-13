@@ -83,10 +83,6 @@ export const DEFAULT_CONFIGS: Record<string, { value: unknown; description: stri
     value: 10,
     description: '成人内容每集解锁价格（金币）',
   },
-  paywall_preview_duration: {
-    value: 180,
-    description: '试看时长（秒）',
-  },
   paywall_enabled: {
     value: true,
     description: '是否启用付费墙功能',
@@ -171,12 +167,6 @@ function validateConfigValue(key: string, value: unknown): { valid: boolean; err
     case 'paywall_adult_price':
       if (typeof value !== 'number' || value < 0 || !Number.isInteger(value)) {
         return { valid: false, error: '内容价格必须是非负整数' };
-      }
-      break;
-
-    case 'paywall_preview_duration':
-      if (typeof value !== 'number' || value < 0 || !Number.isInteger(value)) {
-        return { valid: false, error: '试看时长必须是非负整数（秒）' };
       }
       break;
 

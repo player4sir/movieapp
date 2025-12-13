@@ -108,13 +108,13 @@ function LoadingIndicator({ poster, message }: { poster?: string; message?: stri
 }
 
 // 错误显示组件
-function ErrorDisplay({ 
-  error, 
-  onRetry, 
+function ErrorDisplay({
+  error,
+  onRetry,
   onSwitchSource,
   canRetry,
-}: { 
-  error: ErrorState; 
+}: {
+  error: ErrorState;
   onRetry: () => void;
   onSwitchSource?: () => void;
   canRetry: boolean;
@@ -165,7 +165,7 @@ const ArtVideoPlayer = forwardRef<VideoPlayerRef, Omit<VideoPlayerProps, 'useIfr
     const hlsRef = useRef<Hls | null>(null);
     const retryCountRef = useRef(0);
     const wakeLockRef = useRef<WakeLockSentinel | null>(null);
-    
+
     // 状态
     const [loading, setLoading] = useState(true);
     const [loadingMessage, setLoadingMessage] = useState<string | undefined>();
@@ -177,7 +177,11 @@ const ArtVideoPlayer = forwardRef<VideoPlayerRef, Omit<VideoPlayerProps, 'useIfr
       canRetry: true,
     });
     const [gestureHint, setGestureHint] = useState<{ type: 'seek' | 'speed'; value: string } | null>(null);
-    
+
+    // 横屏模式状态
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [isLandscape, setIsLandscape] = useState(false);
+
     // 长按状态
     const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
     const originalPlaybackRateRef = useRef(1);
@@ -221,18 +225,81 @@ const ArtVideoPlayer = forwardRef<VideoPlayerRef, Omit<VideoPlayerProps, 'useIfr
       };
     }, [requestWakeLock]);
 
+    // 横屏切换功能
+    const toggleLandscape = useCallback(async () => {
+      if (!isFullscreen) return;
+
+      try {
+        if (isLandscape) {
+          // 解锁屏幕方向（恢复竖屏）
+          if (screen.orientation && 'unlock' in screen.orientation) {
+            screen.orientation.unlock();
+          }
+          setIsLandscape(false);
+        } else {
+          // 锁定到横屏
+          if (screen.orientation && 'lock' in screen.orientation) {
+            await (screen.orientation.lock as (orientation: string) => Promise<void>)('landscape');
+            setIsLandscape(true);
+          }
+        }
+      } catch (err) {
+        console.log('[VideoPlayer] Orientation lock/unlock failed:', err);
+        // 即使失败也切换状态，因为用户可以手动旋转设备
+        setIsLandscape(!isLandscape);
+      }
+    }, [isFullscreen, isLandscape]);
+
+    // 监听全屏变化
+    useEffect(() => {
+      const handleFullscreenChange = () => {
+        const fullscreenElement = document.fullscreenElement ||
+          (document as unknown as { webkitFullscreenElement?: Element }).webkitFullscreenElement;
+        const isNowFullscreen = !!fullscreenElement;
+        setIsFullscreen(isNowFullscreen);
+
+        // 退出全屏时解锁屏幕方向
+        if (!isNowFullscreen && isLandscape) {
+          try {
+            if (screen.orientation && 'unlock' in screen.orientation) {
+              screen.orientation.unlock();
+            }
+          } catch (err) {
+            console.log('[VideoPlayer] Orientation unlock failed:', err);
+          }
+          setIsLandscape(false);
+        }
+      };
+
+      document.addEventListener('fullscreenchange', handleFullscreenChange);
+      document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+
+      return () => {
+        document.removeEventListener('fullscreenchange', handleFullscreenChange);
+        document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+        // 清理时解锁屏幕方向
+        try {
+          if (screen.orientation && 'unlock' in screen.orientation) {
+            screen.orientation.unlock();
+          }
+        } catch {
+          // 忽略
+        }
+      };
+    }, [isLandscape]);
+
     // 加载超时处理
     useEffect(() => {
       if (!loading) return;
-      
+
       const timer5s = setTimeout(() => {
         setLoadingMessage('加载中，请稍候...');
       }, 5000);
-      
+
       const timer15s = setTimeout(() => {
         setLoadingMessage('加载较慢，可尝试切换播放源');
       }, 15000);
-      
+
       return () => {
         clearTimeout(timer5s);
         clearTimeout(timer15s);
@@ -256,7 +323,7 @@ const ArtVideoPlayer = forwardRef<VideoPlayerRef, Omit<VideoPlayerProps, 'useIfr
     // 重试播放
     const retry = useCallback(() => {
       if (error.retryCount >= MAX_RETRIES) return;
-      
+
       setError(prev => ({
         ...prev,
         hasError: false,
@@ -265,7 +332,7 @@ const ArtVideoPlayer = forwardRef<VideoPlayerRef, Omit<VideoPlayerProps, 'useIfr
       setLoading(true);
       setLoadingMessage(undefined);
       retryCountRef.current += 1;
-      
+
       // 销毁并重新创建播放器
       if (artRef.current) {
         artRef.current.destroy();
@@ -304,7 +371,7 @@ const ArtVideoPlayer = forwardRef<VideoPlayerRef, Omit<VideoPlayerProps, 'useIfr
       const mobile = isMobileDevice();
       const safari = isSafari();
       const useNative = shouldUseNativeHLS();
-      
+
       // 获取保存的偏好设置
       const prefs = getPlayerPreferences();
 
@@ -314,14 +381,14 @@ const ArtVideoPlayer = forwardRef<VideoPlayerRef, Omit<VideoPlayerProps, 'useIfr
         if (useNative && retryCountRef.current === 0) {
           console.log('[VideoPlayer] Using native HLS support (Safari/iOS)');
           video.src = url;
-          
+
           video.addEventListener('loadedmetadata', () => {
             setLoading(false);
             if (initialPosition > 0) {
               video.currentTime = initialPosition;
             }
           }, { once: true });
-          
+
           video.addEventListener('error', () => {
             console.log('[VideoPlayer] Native HLS failed, falling back to HLS.js');
             // 原生播放失败，尝试HLS.js
@@ -333,7 +400,7 @@ const ArtVideoPlayer = forwardRef<VideoPlayerRef, Omit<VideoPlayerProps, 'useIfr
               handleError('source', 'HLS不支持');
             }
           }, { once: true });
-          
+
           return;
         }
 
@@ -353,7 +420,7 @@ const ArtVideoPlayer = forwardRef<VideoPlayerRef, Omit<VideoPlayerProps, 'useIfr
             if (initialPosition > 0) {
               video.currentTime = initialPosition;
             }
-            
+
             // 画质切换支持
             const qualities = hls.levels.map((level, index) => ({
               html: level.height ? `${level.height}P` : `质量 ${index + 1}`,
@@ -376,7 +443,7 @@ const ArtVideoPlayer = forwardRef<VideoPlayerRef, Omit<VideoPlayerProps, 'useIfr
           // 错误处理（Requirements: 3.1, 3.2）
           hls.on(Hls.Events.ERROR, (_, data) => {
             console.error('[VideoPlayer] HLS Error:', data.type, data.details);
-            
+
             if (data.fatal) {
               switch (data.type) {
                 case Hls.ErrorTypes.NETWORK_ERROR:
@@ -545,7 +612,7 @@ const ArtVideoPlayer = forwardRef<VideoPlayerRef, Omit<VideoPlayerProps, 'useIfr
               clearTimeout(singleTapTimer);
               singleTapTimer = null;
             }
-            
+
             // 双击检测
             if (tapX < containerWidth / 3) {
               // 左侧双击：快退10秒
@@ -564,7 +631,7 @@ const ArtVideoPlayer = forwardRef<VideoPlayerRef, Omit<VideoPlayerProps, 'useIfr
             } else {
               // 中央双击：也可以快进（可选行为）
             }
-            
+
             // 重置lastTap防止连续触发
             lastTap = 0;
           } else {
@@ -573,9 +640,9 @@ const ArtVideoPlayer = forwardRef<VideoPlayerRef, Omit<VideoPlayerProps, 'useIfr
             if (singleTapTimer) {
               clearTimeout(singleTapTimer);
             }
-            
+
             const isCenterArea = tapX >= containerWidth / 3 && tapX <= (containerWidth * 2) / 3;
-            
+
             singleTapTimer = setTimeout(() => {
               // 单击中央区域：切换播放/暂停（Requirements: 4.3）
               if (isCenterArea) {
@@ -583,7 +650,7 @@ const ArtVideoPlayer = forwardRef<VideoPlayerRef, Omit<VideoPlayerProps, 'useIfr
               }
               singleTapTimer = null;
             }, 300);
-            
+
             lastTap = now;
             lastTapX = tapX;
           }
@@ -638,18 +705,18 @@ const ArtVideoPlayer = forwardRef<VideoPlayerRef, Omit<VideoPlayerProps, 'useIfr
           artRef.current = null;
         }
       };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [src, token, poster, initialPosition, onTimeUpdate, onEnded, handleError, error.hasError, retry, requestWakeLock, releaseWakeLock]);
 
     return (
       <div className="relative aspect-video bg-black">
         <div ref={containerRef} className="w-full h-full" />
-        
+
         {/* 加载指示器 */}
         {loading && !error.hasError && (
           <LoadingIndicator poster={poster} message={loadingMessage} />
         )}
-        
+
         {/* 错误显示 */}
         {error.hasError && (
           <ErrorDisplay
@@ -659,10 +726,33 @@ const ArtVideoPlayer = forwardRef<VideoPlayerRef, Omit<VideoPlayerProps, 'useIfr
             canRetry={error.canRetry}
           />
         )}
-        
+
         {/* 手势提示 */}
         {gestureHint && (
           <GestureHint type={gestureHint.type} value={gestureHint.value} />
+        )}
+
+        {/* 移动端全屏横屏切换按钮 */}
+        {isFullscreen && isMobileDevice() && (
+          <button
+            onClick={toggleLandscape}
+            className="absolute top-4 right-4 z-30 p-2.5 bg-black/60 hover:bg-black/80 rounded-full text-white transition-all touch-manipulation"
+            aria-label={isLandscape ? '竖屏模式' : '横屏模式'}
+          >
+            {isLandscape ? (
+              // 竖屏图标
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <rect x="6" y="3" width="12" height="18" rx="2" strokeWidth="2" />
+                <line x1="12" y1="18" x2="12" y2="18" strokeWidth="3" strokeLinecap="round" />
+              </svg>
+            ) : (
+              // 横屏图标
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <rect x="3" y="6" width="18" height="12" rx="2" strokeWidth="2" />
+                <line x1="18" y1="12" x2="18" y2="12" strokeWidth="3" strokeLinecap="round" />
+              </svg>
+            )}
+          </button>
         )}
       </div>
     );

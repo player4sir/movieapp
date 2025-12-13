@@ -8,10 +8,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, isAuthError } from '@/lib/auth-middleware';
-import { 
-  getConfig, 
-  updateConfig, 
-  CONFIG_ERRORS 
+import {
+  getConfig,
+  updateConfig,
+  CONFIG_ERRORS
 } from '@/services/config.service';
 
 // ============================================
@@ -21,7 +21,6 @@ import {
 const PAYWALL_CONFIG_KEYS = [
   'paywall_normal_price',
   'paywall_adult_price',
-  'paywall_preview_duration',
   'paywall_enabled',
 ] as const;
 
@@ -34,10 +33,6 @@ const PAYWALL_DEFAULTS: Record<string, { value: unknown; description: string }> 
   paywall_adult_price: {
     value: 10,
     description: '成人内容每集解锁价格（金币）',
-  },
-  paywall_preview_duration: {
-    value: 180,
-    description: '试看时长（秒）',
   },
   paywall_enabled: {
     value: true,
@@ -68,12 +63,6 @@ function validatePaywallConfig(key: string, value: unknown): { valid: boolean; e
       }
       break;
 
-    case 'paywall_preview_duration':
-      if (typeof value !== 'number' || value < 0 || !Number.isInteger(value)) {
-        return { valid: false, error: '试看时长必须是非负整数（秒）' };
-      }
-      break;
-
     case 'paywall_enabled':
       if (typeof value !== 'boolean') {
         return { valid: false, error: '付费墙开关必须是布尔值' };
@@ -99,7 +88,7 @@ function validatePaywallConfig(key: string, value: unknown): { valid: boolean; e
  */
 export async function GET(request: NextRequest) {
   const authResult = await requireAdmin(request);
-  
+
   if (isAuthError(authResult)) {
     return authResult;
   }
@@ -134,7 +123,7 @@ export async function GET(request: NextRequest) {
     }, { status: 200 });
   } catch (error: unknown) {
     console.error('Get paywall configs error:', error);
-    
+
     return NextResponse.json(
       { code: 'INTERNAL_ERROR', message: '获取付费墙配置失败' },
       { status: 500 }
@@ -152,11 +141,10 @@ export async function GET(request: NextRequest) {
  * 
  * Requirements: 1.2 - Apply normal content price
  * Requirements: 1.3 - Apply adult content price
- * Requirements: 1.4 - Configure preview duration
  */
 export async function PUT(request: NextRequest) {
   const authResult = await requireAdmin(request);
-  
+
   if (isAuthError(authResult)) {
     return authResult;
   }
@@ -214,11 +202,11 @@ export async function PUT(request: NextRequest) {
     }, { status: 200 });
   } catch (error: unknown) {
     console.error('Update paywall config error:', error);
-    
+
     const configError = error as { code?: string; message?: string };
-    
+
     if (configError.code === CONFIG_ERRORS.VALIDATION_FAILED.code ||
-        configError.code === CONFIG_ERRORS.INVALID_CONFIG.code) {
+      configError.code === CONFIG_ERRORS.INVALID_CONFIG.code) {
       return NextResponse.json(
         { code: configError.code, message: configError.message },
         { status: 400 }

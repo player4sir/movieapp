@@ -73,7 +73,6 @@ export interface UnlockResult {
 const CONFIG_KEYS = {
   NORMAL_PRICE: 'paywall_normal_price',
   ADULT_PRICE: 'paywall_adult_price',
-  PREVIEW_DURATION: 'paywall_preview_duration',
   ENABLED: 'paywall_enabled',
 } as const;
 
@@ -81,7 +80,6 @@ const CONFIG_KEYS = {
 const DEFAULT_CONFIG = {
   normalPrice: 1,
   adultPrice: 10,
-  previewDuration: 180,
   enabled: true,
 };
 
@@ -139,20 +137,6 @@ export async function getPrice(sourceCategory: SourceCategory): Promise<number> 
 }
 
 /**
- * Get preview duration in seconds.
- * 
- * Requirements: 1.4
- */
-export async function getPreviewDuration(): Promise<number> {
-  try {
-    const config = await getConfig(CONFIG_KEYS.PREVIEW_DURATION);
-    return typeof config.value === 'number' ? config.value : DEFAULT_CONFIG.previewDuration;
-  } catch {
-    return DEFAULT_CONFIG.previewDuration;
-  }
-}
-
-/**
  * Check if paywall is enabled.
  */
 export async function isPaywallEnabled(): Promise<boolean> {
@@ -166,7 +150,7 @@ export async function isPaywallEnabled(): Promise<boolean> {
 
 /**
  * Check user's access to specific content.
- * Determines access type based on VIP status, purchase history, or preview mode.
+ * Determines access type based on VIP status or purchase history.
  * 
  * Requirements: 2.1, 2.2, 2.3, 2.4
  */
