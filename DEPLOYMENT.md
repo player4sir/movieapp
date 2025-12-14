@@ -261,6 +261,522 @@ npm run pages:preview
 
 ---
 
+## 4. 宝塔面板部署 (自有服务器)
+
+使用宝塔面板在自有 Linux 服务器上部署，支持 PM2 和 Docker 两种方式。
+
+### 服务器要求
+
+| 配置项 | 最低要求 | 推荐配置 |
+|--------|---------|----------|
+| CPU | 1 核 | 2 核+ |
+| 内存 | 1GB | 2GB+ |
+| 硬盘 | 10GB | 20GB+ |
+| 系统 | CentOS 7+ / Ubuntu 18+ / Debian 10+ | Ubuntu 22.04 |
+
+### 前置准备
+
+#### 步骤 1: 安装宝塔面板
+
+```bash
+# CentOS
+yum install -y wget && wget -O install.sh https://download.bt.cn/install/install_6.0.sh && sh install.sh ed8484bec
+
+# Ubuntu/Debian
+wget -O install.sh https://download.bt.cn/install/install-ubuntu_6.0.sh && sudo bash install.sh ed8484bec
+```
+
+安装完成后，访问宝塔面板地址并登录。
+
+#### 步骤 2: 安装必要软件
+
+在宝塔面板 **软件商店** 中安装：
+
+| 软件 | 版本要求 | 用途 |
+|------|---------|------|
+| Nginx | 1.20+ | 反向代理 |
+| PostgreSQL | 15+ | 数据库 |
+| PM2 管理器 | 最新版 | Node.js 进程管理 |
+| Node.js | 20+ | 运行环境 |
+
+> [!IMPORTANT]
+> Node.js 必须安装 20.x 或更高版本。在软件商店搜索 "Node.js版本管理器" 进行安装和版本切换。
+
+---
+
+### 方式 A: PM2 部署 (推荐)
+
+适合轻量级部署，资源占用少。
+
+#### 步骤 1: 上传项目代码
+
+**方式 1: 通过宝塔文件管理器上传**
+
+1. 进入 **文件** 管理
+2. 导航到 `/www/wwwroot/`
+3. 创建目录 `movie-app`
+4. 上传项目代码 (ZIP 压缩包后解压)
+
+**方式 2: 通过 Git 拉取**
+
+> [!TIP]
+> 如果服务器未安装 Git，需要先安装：
+> ```bash
+> # CentOS/RHEL
+> yum install -y git
+> 
+> # Ubuntu/Debian
+> apt-get update && apt-get install -y git
+> 
+> # 验证安装
+> git --version
+> ```
+
+```bash
+# SSH 连接到服务器
+cd /www/wwwroot
+git clone https://github.com/your-repo/movie-app.git
+cd movie-app
+```
+
+#### 步骤 2: 配置环境变量
+
+```bash
+cd /www/wwwroot/movie-app
+
+# 复制环境变量示例
+cp .env.example .env
+
+# 编辑环境变量
+nano .env
+```
+
+配置以下必要变量：
+
+```env
+# 数据库连接 (宝塔 PostgreSQL)
+DATABASE_URL=postgres://postgres:你的密码@127.0.0.1:5432/movieshell
+
+# JWT 密钥 (至少32个字符的随机字符串)
+JWT_SECRET=your-very-long-random-secret-key-here-32chars
+JWT_REFRESH_SECRET=your-refresh-token-secret-key-here
+NEXTAUTH_SECRET=your-nextauth-secret-key-here
+
+# 视频 API
+VIDEO_API_URL=http://api.example.com
+
+# 播放令牌
+PLAYBACK_TOKEN_SECRET=your-playback-secret-key-here
+```
+
+> [!TIP]
+> 生成随机密钥: `openssl rand -base64 32`
+
+#### 步骤 3: 创建数据库
+
+在宝塔面板 **数据库** 页面：
+
+1. 点击 **添加数据库**
+2. 数据库类型选择 **PostgreSQL**
+3. 数据库名: `movieshell`
+4. 用户名: `postgres` (或自定义)
+5. 密码: 设置强密码
+6. 点击 **提交**
+
+#### 步骤 4: 安装依赖并构建
+
+```bash
+cd /www/wwwroot/movie-app
+
+# 安装依赖
+npm install
+
+# 构建项目
+npm run build
+
+# 推送数据库结构
+npm run db:push
+
+# (可选) 填充测试数据
+npm run db:seed
+```
+
+#### 步骤 5: 使用 PM2 启动
+
+**方式 1: 通过宝塔 PM2 管理器**
+
+1. 进入 **软件商店** > **PM2 管理器** > **设置**
+2. 点击 **添加项目**
+3. 填写配置:
+   - 项目名称: `movie-app`
+   - 启动文件: `npm`
+   - 运行目录: `/www/wwwroot/movie-app`
+   - 运行参数: `start`
+   - 端口: `3000`
+
+**方式 2: 通过命令行**
+
+```bash
+cd /www/wwwroot/movie-app
+
+# 启动应用
+pm2 start npm --name "movie-app" -- start
+
+# 保存 PM2 配置 (开机自启)
+pm2 save
+
+# 查看运行状态
+pm2 status
+
+# 查看日志
+pm2 logs movie-app
+```
+
+**PM2 常用命令:**
+
+```bash
+pm2 restart movie-app    # 重启
+pm2 stop movie-app       # 停止
+pm2 delete movie-app     # 删除
+pm2 logs movie-app       # 查看日志
+pm2 monit                # 监控面板
+```
+
+---
+
+### 方式 B: Docker 部署
+
+适合需要隔离环境或多项目部署的场景。
+
+#### 步骤 1: 安装 Docker
+
+在宝塔面板 **软件商店** 搜索并安装 **Docker管理器**。
+
+或通过命令行安装：
+
+```bash
+# CentOS
+curl -fsSL https://get.docker.com | bash
+
+# 启动 Docker
+systemctl start docker
+systemctl enable docker
+```
+
+#### 步骤 2: 配置环境变量
+
+```bash
+cd /www/wwwroot/movie-app
+
+# 编辑 .env 文件
+cp .env.example .env
+nano .env
+```
+
+配置 DATABASE_URL 指向外部 PostgreSQL 或使用 Docker 内置数据库：
+
+```env
+# 使用外部数据库
+DATABASE_URL=postgres://postgres:密码@127.0.0.1:5432/movieshell
+
+# 或使用 Docker Compose 内置数据库
+DATABASE_URL=postgres://postgres:password@db:5432/movieshell
+```
+
+#### 步骤 3: 使用 Docker Compose 启动
+
+```bash
+cd /www/wwwroot/movie-app
+
+# 构建并启动 (后台运行)
+docker-compose up -d --build
+
+# 查看运行状态
+docker-compose ps
+
+# 查看日志
+docker-compose logs -f
+
+# 运行数据库迁移
+docker exec -it movie-app npm run db:push
+```
+
+**Docker 常用命令:**
+
+```bash
+docker-compose restart   # 重启服务
+docker-compose down      # 停止并删除容器
+docker-compose pull      # 拉取最新镜像
+docker-compose logs -f   # 查看实时日志
+```
+
+---
+
+### Nginx 反向代理配置
+
+#### 步骤 1: 添加网站
+
+在宝塔面板 **网站** 页面：
+
+1. 点击 **添加站点**
+2. 域名: `your-domain.com` (或服务器 IP)
+3. 根目录: `/www/wwwroot/movie-app/public`
+4. PHP 版本: **纯静态**
+5. 点击 **提交**
+
+#### 步骤 2: 配置反向代理
+
+1. 点击刚创建的站点 **设置**
+2. 选择 **反向代理**
+3. 点击 **添加反向代理**
+4. 配置:
+   - 代理名称: `nextjs`
+   - 目标URL: `http://127.0.0.1:3000`
+   - 发送域名: `$host`
+5. 点击 **提交**
+
+#### 步骤 3: 修改 Nginx 配置 (可选优化)
+
+点击 **配置文件**，在 `server` 块中添加优化配置：
+
+```nginx
+# 反向代理配置
+location / {
+    proxy_pass http://127.0.0.1:3000;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection 'upgrade';
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_cache_bypass $http_upgrade;
+    
+    # 超时设置
+    proxy_connect_timeout 60s;
+    proxy_send_timeout 60s;
+    proxy_read_timeout 60s;
+}
+
+# 静态资源缓存
+location /_next/static/ {
+    proxy_pass http://127.0.0.1:3000;
+    proxy_cache_valid 60m;
+    add_header Cache-Control "public, max-age=31536000, immutable";
+}
+
+# Gzip 压缩
+gzip on;
+gzip_vary on;
+gzip_proxied any;
+gzip_comp_level 6;
+gzip_types text/plain text/css text/xml application/json application/javascript application/rss+xml application/atom+xml image/svg+xml;
+```
+
+---
+
+### SSL 证书配置
+
+#### 使用 Let's Encrypt 免费证书
+
+1. 进入站点 **设置** > **SSL**
+2. 选择 **Let's Encrypt**
+3. 勾选需要申请证书的域名
+4. 点击 **申请**
+5. 申请成功后，开启 **强制HTTPS**
+
+> [!NOTE]
+> Let's Encrypt 证书有效期 90 天，宝塔会自动续期。
+
+#### 使用自有证书
+
+1. 进入站点 **设置** > **SSL**
+2. 选择 **其他证书**
+3. 粘贴证书内容 (PEM 格式) 和私钥
+4. 点击 **保存**
+5. 开启 **强制HTTPS**
+
+---
+
+### 更新部署
+
+#### PM2 更新
+
+```bash
+cd /www/wwwroot/movie-app
+
+# 拉取最新代码
+git pull origin main
+
+# 安装新依赖
+npm install
+
+# 重新构建
+npm run build
+
+# 运行数据库迁移 (如有)
+npm run db:push
+
+# 重启应用
+pm2 restart movie-app
+```
+
+#### Docker 更新
+
+```bash
+cd /www/wwwroot/movie-app
+
+# 拉取最新代码
+git pull origin main
+
+# 重新构建并启动
+docker-compose up -d --build
+
+# 运行数据库迁移 (如有)
+docker exec -it movie-app npm run db:push
+```
+
+---
+
+### 性能优化
+
+#### 1. Node.js 内存配置
+
+在启动命令中增加内存限制：
+
+```bash
+# PM2 配置
+pm2 start npm --name "movie-app" -- start --node-args="--max-old-space-size=1024"
+
+# 或在 ecosystem.config.js 中配置
+module.exports = {
+  apps: [{
+    name: 'movie-app',
+    script: 'npm',
+    args: 'start',
+    cwd: '/www/wwwroot/movie-app',
+    node_args: '--max-old-space-size=1024',
+    env: {
+      NODE_ENV: 'production'
+    }
+  }]
+};
+```
+
+#### 2. 配置 Swap 空间
+
+小内存服务器建议配置 Swap：
+
+```bash
+# 创建 2GB Swap
+fallocate -l 2G /swapfile
+chmod 600 /swapfile
+mkswap /swapfile
+swapon /swapfile
+
+# 永久生效
+echo '/swapfile none swap sw 0 0' >> /etc/fstab
+```
+
+#### 3. 启用宝塔面板优化
+
+- **网站加速**: 在宝塔面板 **加速** 中启用站点加速
+- **数据库优化**: 定期清理日志，优化表结构
+
+---
+
+### 常见问题排查
+
+#### 问题 1: Node.js 版本不满足要求
+
+**现象**: `npm install` 或 `npm run build` 报错
+
+**解决方案**:
+
+```bash
+# 检查当前版本
+node -v
+
+# 使用 nvm 切换版本 (宝塔自带)
+nvm install 20
+nvm use 20
+nvm alias default 20
+```
+
+#### 问题 2: 端口 3000 被占用
+
+**现象**: 启动失败，提示端口被占用
+
+**解决方案**:
+
+```bash
+# 查找占用端口的进程
+lsof -i:3000
+
+# 杀死进程
+kill -9 <PID>
+
+# 或修改 Next.js 启动端口
+PORT=3001 npm start
+```
+
+#### 问题 3: 内存不足导致构建失败
+
+**现象**: `npm run build` 时进程被 kill
+
+**解决方案**:
+
+```bash
+# 增加 Node.js 可用内存
+export NODE_OPTIONS="--max-old-space-size=2048"
+npm run build
+
+# 或配置 Swap 空间 (见上方)
+```
+
+#### 问题 4: 数据库连接失败
+
+**现象**: 应用启动后无法连接数据库
+
+**解决方案**:
+
+1. 确认 PostgreSQL 服务运行中
+2. 检查 DATABASE_URL 格式是否正确
+3. 确认数据库用户有足够权限
+4. 检查防火墙是否放行 5432 端口
+
+```bash
+# 测试数据库连接
+psql $DATABASE_URL -c "SELECT 1"
+```
+
+#### 问题 5: Nginx 502 Bad Gateway
+
+**现象**: 访问网站显示 502 错误
+
+**解决方案**:
+
+1. 确认 Node.js 应用正在运行: `pm2 status`
+2. 检查应用是否监听在 3000 端口: `netstat -tlnp | grep 3000`
+3. 查看 PM2 日志排查错误: `pm2 logs movie-app`
+
+#### 问题 6: 静态资源 404
+
+**现象**: 页面加载但样式/脚本缺失
+
+**解决方案**:
+
+确认 Nginx 反向代理配置正确，所有请求都转发到 Next.js:
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:3000;
+    # ... 其他配置
+}
+```
+
+---
+
 ## 数据库迁移
 
 首次部署需要运行数据库迁移：
