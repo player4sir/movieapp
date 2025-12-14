@@ -21,6 +21,7 @@ export interface WatchHistoryItem {
   position: number;
   duration: number;
   sourceIndex: number;
+  sourceCategory: 'normal' | 'adult';
   watchedAt: string;
 }
 

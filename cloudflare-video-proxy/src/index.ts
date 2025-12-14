@@ -191,7 +191,13 @@ function buildProxyHeaders(originalRequest: Request, targetUrl: URL): Headers {
  */
 async function fetchWithRetry(targetUrl: string, parsedTarget: URL): Promise<Response> {
     const strategies: Record<string, string>[] = [
-        // 策略1: 完整浏览器头
+        // 策略1: VLC 播放器 (很多源不会屏蔽 VLC)
+        {
+            'User-Agent': 'VLC/3.0.20 LibVLC/3.0.20',
+            'Accept': '*/*',
+            'Host': parsedTarget.host,
+        },
+        // 策略2: 完整浏览器头
         {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept': '*/*',
@@ -200,7 +206,19 @@ async function fetchWithRetry(targetUrl: string, parsedTarget: URL): Promise<Res
             'Origin': parsedTarget.origin,
             'Host': parsedTarget.host,
         },
-        // 策略2: 移动端 UA
+        // 策略3: ExoPlayer (Android 官方播放器)
+        {
+            'User-Agent': 'ExoPlayer/2.19.1 (Linux;Android 13) ExoPlayerLib/2.19.1',
+            'Accept': '*/*',
+            'Host': parsedTarget.host,
+        },
+        // 策略4: Kodi 播放器
+        {
+            'User-Agent': 'Kodi/20.2 (Windows NT 10.0; Win64; x64) App_Bitness/64 Version/20.2-Nexus',
+            'Accept': '*/*',
+            'Host': parsedTarget.host,
+        },
+        // 策略5: 移动端浏览器 + Referer
         {
             'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
             'Accept': '*/*',
@@ -208,15 +226,19 @@ async function fetchWithRetry(targetUrl: string, parsedTarget: URL): Promise<Res
             'Referer': parsedTarget.origin + '/',
             'Host': parsedTarget.host,
         },
-        // 策略3: 播放器 UA (无 Referer)
+        // 策略6: 无 Referer 的播放器
         {
             'User-Agent': 'AptvPlayer/1.4.10',
             'Accept': '*/*',
             'Host': parsedTarget.host,
         },
-        // 策略4: 最小化头
+        // 策略7: Android Dalvik
         {
             'User-Agent': 'Dalvik/2.1.0 (Linux; U; Android 12; Pixel 6 Build/SD1A.210817.023)',
+            'Host': parsedTarget.host,
+        },
+        // 策略8: 最小化 - 仅 Host
+        {
             'Host': parsedTarget.host,
         },
     ];

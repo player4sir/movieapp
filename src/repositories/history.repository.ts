@@ -17,6 +17,7 @@ export interface UpsertHistoryInput {
   position?: number;
   duration?: number;
   sourceIndex?: number;
+  sourceCategory?: 'normal' | 'adult';
 }
 
 // ============================================
@@ -31,14 +32,15 @@ export interface UpsertHistoryInput {
  */
 export class WatchHistoryRepository extends BaseRepository {
   /**
-   * Find a watch history entry by user ID and VOD ID.
+   * Find a watch history entry by user ID, VOD ID, and source category.
    */
-  async findByUserAndVod(userId: string, vodId: number): Promise<WatchHistory | null> {
+  async findByUserAndVod(userId: string, vodId: number, sourceCategory: 'normal' | 'adult' = 'normal'): Promise<WatchHistory | null> {
     try {
       const result = await this.db.query.watchHistory.findFirst({
         where: and(
           eq(watchHistory.userId, userId),
-          eq(watchHistory.vodId, vodId)
+          eq(watchHistory.vodId, vodId),
+          eq(watchHistory.sourceCategory, sourceCategory)
         ),
       });
       return result ?? null;
@@ -71,8 +73,9 @@ export class WatchHistoryRepository extends BaseRepository {
    */
   async upsert(input: UpsertHistoryInput): Promise<WatchHistory> {
     try {
-      const existing = await this.findByUserAndVod(input.userId, input.vodId);
-      
+      const sourceCategory = input.sourceCategory ?? 'normal';
+      const existing = await this.findByUserAndVod(input.userId, input.vodId, sourceCategory);
+
       if (existing) {
         // Update existing entry
         const [updated] = await this.db.update(watchHistory)
@@ -90,7 +93,7 @@ export class WatchHistoryRepository extends BaseRepository {
           .returning();
         return updated;
       }
-      
+
       // Create new entry
       const [created] = await this.db.insert(watchHistory)
         .values({
@@ -104,6 +107,7 @@ export class WatchHistoryRepository extends BaseRepository {
           position: input.position ?? 0,
           duration: input.duration ?? 0,
           sourceIndex: input.sourceIndex ?? 0,
+          sourceCategory: sourceCategory,
           watchedAt: new Date(),
         })
         .returning();

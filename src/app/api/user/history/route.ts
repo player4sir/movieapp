@@ -22,7 +22,7 @@ const watchHistoryRepository = new WatchHistoryRepository();
  */
 export async function GET(request: NextRequest) {
   const authResult = await requireAuth(request);
-  
+
   if (isAuthError(authResult)) {
     return authResult;
   }
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   const authResult = await requireAuth(request);
-  
+
   if (isAuthError(authResult)) {
     return authResult;
   }
@@ -67,6 +67,7 @@ export async function POST(request: NextRequest) {
       position,
       duration,
       sourceIndex,
+      sourceCategory,
     } = body;
 
     // Validate required fields
@@ -91,6 +92,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate sourceCategory if provided
+    const validSourceCategory = sourceCategory === 'adult' ? 'adult' : 'normal';
+
     // Upsert watch history (update if exists, create if not)
     const historyEntry = await watchHistoryRepository.upsert({
       userId: user.id,
@@ -102,6 +106,7 @@ export async function POST(request: NextRequest) {
       position,
       duration: duration ?? 0,
       sourceIndex: sourceIndex ?? 0,
+      sourceCategory: validSourceCategory,
     });
 
     return NextResponse.json({ data: historyEntry }, { status: 200 });
@@ -121,7 +126,7 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   const authResult = await requireAuth(request);
-  
+
   if (isAuthError(authResult)) {
     return authResult;
   }

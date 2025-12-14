@@ -265,12 +265,13 @@ function PlayPageContent() {
           position: Math.floor(currentTime),
           duration: Math.floor(duration),
           sourceIndex: selectedSourceIndex,
+          sourceCategory: sourceCategory,
         }),
       });
     } catch (err) {
       console.error('Failed to save progress:', err);
     }
-  }, [vod, selectedSourceIndex, selectedEpisodeIndex]);
+  }, [vod, selectedSourceIndex, selectedEpisodeIndex, sourceCategory]);
 
   // Handle time update from video player - simplified without preview tracking
   // Requirements: 1.2 - Allow unrestricted playback for users with full access

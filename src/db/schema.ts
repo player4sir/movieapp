@@ -143,11 +143,13 @@ export const watchHistory = pgTable('WatchHistory', {
   position: integer('position').default(0).notNull(),
   duration: integer('duration').default(0).notNull(),
   sourceIndex: integer('sourceIndex').default(0).notNull(),
+  sourceCategory: sourceCategoryEnum('sourceCategory').default('normal').notNull(),
   watchedAt: timestamp('watchedAt').defaultNow().notNull(),
 }, (table) => [
-  uniqueIndex('WatchHistory_userId_vodId_key').on(table.userId, table.vodId),
+  uniqueIndex('WatchHistory_userId_vodId_sourceCategory_key').on(table.userId, table.vodId, table.sourceCategory),
   index('WatchHistory_userId_idx').on(table.userId),
   index('WatchHistory_watchedAt_idx').on(table.watchedAt),
+  index('WatchHistory_sourceCategory_idx').on(table.sourceCategory),
 ]);
 
 // ============================================

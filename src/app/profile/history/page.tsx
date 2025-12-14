@@ -16,7 +16,7 @@ function formatDuration(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
-  
+
   if (hours > 0) {
     return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
@@ -142,11 +142,11 @@ export default function HistoryPage() {
           <div className="px-4 py-2">
             {history.map((item) => {
               const progress = item.duration > 0 ? (item.position / item.duration) * 100 : 0;
-              
+
               return (
                 <Link
                   key={item.id}
-                  href={`/play/${item.vodId}?ep=${item.episodeIndex}&source=${item.sourceIndex}`}
+                  href={`/play/${item.vodId}?ep=${item.episodeIndex}&source=${item.sourceIndex}&sourceCategory=${item.sourceCategory || 'normal'}`}
                   className="flex gap-3 p-3 bg-surface rounded-lg mb-3 active:bg-surface-secondary"
                 >
                   {/* Poster with Progress */}
