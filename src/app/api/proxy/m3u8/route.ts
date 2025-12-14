@@ -15,16 +15,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { filterM3U8Ads, AdFilterConfig } from '@/lib/ad-filter';
 import { verifyPlaybackToken, generatePlaybackToken } from '@/services/playback-token.service';
+import {
+  FETCH_TIMEOUT,
+  USER_AGENTS,
+  CF_WORKER_PROXY_URL,
+  shouldUseWorkerProxy,
+  markDomainNeedsWorker,
+  buildWorkerProxyUrl,
+} from '@/lib/proxy-config';
 
 // Force dynamic rendering to fix build errors with searchParams
 export const dynamic = 'force-dynamic';
-
-// 移动端使用更长的超时时间（Requirements: 2.4）
-const FETCH_TIMEOUT = 20000; // 20秒
-
-// Cloudflare Worker 代理 URL（用于绕过 403 限制）
-const CF_WORKER_PROXY_URL = process.env.VIDEO_PROXY_WORKER_URL || 'https://video-proxy.player4sir.workers.dev';
-const CF_WORKER_SECRET = process.env.VIDEO_PROXY_WORKER_SECRET || '';
 
 /**
  * 解析URL中的相对路径，返回绝对URL
@@ -128,12 +129,34 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // User-Agent策略 - 使用通用的UA以兼容大多数视频源
-    const userAgents = [
-      'AptvPlayer/1.4.10',
-      'Dalvik/2.1.0 (Linux; U; Android 12; Pixel 6 Build/SD1A.210817.023)',
-      'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15',
-    ];
+    const domain = parsedUrl.hostname;
+
+    // 检查是否应该直接使用 Worker 代理（基于缓存的域名偏好）
+    let response: Response | null = null;
+    let lastError: Error | null = null;
+    let usedCachedWorker = false;
+
+    if (shouldUseWorkerProxy(domain) && CF_WORKER_PROXY_URL) {
+      console.log(`[M3U8 Proxy] Using cached Worker preference for ${domain}`);
+      const workerUrl = buildWorkerProxyUrl(decodedUrl);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT.M3U8);
+
+      try {
+        response = await fetch(workerUrl, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          usedCachedWorker = true;
+        } else {
+          response = null; // Reset to try direct connection
+        }
+      } catch (err) {
+        clearTimeout(timeoutId);
+        console.error('[M3U8 Proxy] Cached Worker request failed:', err);
+        response = null;
+      }
+    }
 
     // 使用视频源的origin作为referer
     const referers = [
@@ -141,79 +164,75 @@ export async function GET(request: NextRequest) {
       '',
     ];
 
-    let response: Response | null = null;
-    let lastError: Error | null = null;
-    let usedWorkerProxy = false;
+    // 如果缓存的 Worker 没有成功，尝试直连
+    if (!usedCachedWorker) {
+      // Try different combinations of User-Agent and Referer
+      outer: for (const userAgent of USER_AGENTS) {
+        for (const referer of referers) {
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT.M3U8);
 
-    // Try different combinations of User-Agent and Referer
-    outer: for (const userAgent of userAgents) {
-      for (const referer of referers) {
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
+            // Build headers - some servers reject requests with Origin header
+            const headers: Record<string, string> = {
+              'User-Agent': userAgent,
+              'Accept': '*/*',
+              'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+            };
 
-          // Build headers - some servers reject requests with Origin header
-          const headers: Record<string, string> = {
-            'User-Agent': userAgent,
-            'Accept': '*/*',
-            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-          };
+            // Only add Referer if not empty
+            if (referer) {
+              headers['Referer'] = referer;
+            }
 
-          // Only add Referer if not empty
-          if (referer) {
-            headers['Referer'] = referer;
+            response = await fetch(decodedUrl, {
+              headers,
+              signal: controller.signal,
+            });
+
+            clearTimeout(timeoutId);
+
+            if (response.ok) {
+              break outer; // Success, exit both loops
+            }
+          } catch (err) {
+            if (err instanceof Error && err.name === 'AbortError') {
+              lastError = new Error('Request timeout');
+            } else {
+              lastError = err instanceof Error ? err : new Error(String(err));
+            }
           }
+        }
+      }
 
-          response = await fetch(decodedUrl, {
-            headers,
+      // If response is 403, try Cloudflare Worker proxy as fallback
+      if (response && response.status === 403 && CF_WORKER_PROXY_URL) {
+        console.log('[M3U8 Proxy] Got 403, trying Cloudflare Worker fallback...');
+        try {
+          const workerUrl = buildWorkerProxyUrl(decodedUrl);
+
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT.M3U8);
+
+          response = await fetch(workerUrl, {
             signal: controller.signal,
           });
 
           clearTimeout(timeoutId);
 
           if (response.ok) {
-            break outer; // Success, exit both loops
+            // 标记该域名需要使用 Worker 代理
+            markDomainNeedsWorker(domain);
+            console.log('[M3U8 Proxy] Cloudflare Worker fallback succeeded');
+          } else {
+            console.error('[M3U8 Proxy] Cloudflare Worker fallback failed:', response.status);
           }
         } catch (err) {
-          if (err instanceof Error && err.name === 'AbortError') {
-            lastError = new Error('Request timeout');
-          } else {
-            lastError = err instanceof Error ? err : new Error(String(err));
-          }
+          console.error('[M3U8 Proxy] Cloudflare Worker fallback error:', err);
+          // Keep the original 403 response
         }
       }
-    }
-
-    // If response is 403, try Cloudflare Worker proxy as fallback
-    if (response && response.status === 403 && CF_WORKER_PROXY_URL) {
-      console.log('[M3U8 Proxy] Got 403, trying Cloudflare Worker fallback...');
-      try {
-        const workerUrl = new URL('/proxy', CF_WORKER_PROXY_URL);
-        workerUrl.searchParams.set('url', decodedUrl);
-        if (CF_WORKER_SECRET) {
-          workerUrl.searchParams.set('key', CF_WORKER_SECRET);
-        }
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
-
-        response = await fetch(workerUrl.toString(), {
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeoutId);
-
-        if (response.ok) {
-          usedWorkerProxy = true;
-          console.log('[M3U8 Proxy] Cloudflare Worker fallback succeeded');
-        } else {
-          console.error('[M3U8 Proxy] Cloudflare Worker fallback failed:', response.status);
-        }
-      } catch (err) {
-        console.error('[M3U8 Proxy] Cloudflare Worker fallback error:', err);
-        // Keep the original 403 response
-      }
-    }
+    } // end of if (!usedCachedWorker)
 
     if (!response) {
       throw lastError || new Error('All referer attempts failed');
