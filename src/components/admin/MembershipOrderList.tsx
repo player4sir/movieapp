@@ -8,10 +8,10 @@
  * Requirements: 6.1, 6.4
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { TableSkeleton, NetworkError } from './index';
 
-type OrderStatus = 'pending' | 'approved' | 'rejected';
+type OrderStatus = 'pending' | 'paid' | 'approved' | 'rejected';
 type PaymentType = 'wechat' | 'alipay';
 type MemberLevel = 'vip' | 'svip';
 
@@ -59,6 +59,7 @@ export interface MembershipOrderListProps {
 
 const STATUS_CONFIG: Record<OrderStatus, { label: string; color: string; bgColor: string }> = {
   pending: { label: '待审核', color: 'text-yellow-500', bgColor: 'bg-yellow-500/10' },
+  paid: { label: '已支付', color: 'text-blue-500', bgColor: 'bg-blue-500/10' },
   approved: { label: '已通过', color: 'text-green-500', bgColor: 'bg-green-500/10' },
   rejected: { label: '已拒绝', color: 'text-red-400', bgColor: 'bg-red-500/10' },
 };
@@ -208,9 +209,8 @@ export function MembershipOrderList({
                 const isExpanded = expandedOrderId === order.id;
 
                 return (
-                  <>
+                  <React.Fragment key={order.id}>
                     <tr
-                      key={order.id}
                       onClick={() => toggleExpand(order.id)}
                       className={`hover:bg-surface-secondary/30 transition-colors cursor-pointer ${isExpanded ? 'bg-surface-secondary/30' : ''
                         }`}
@@ -258,7 +258,7 @@ export function MembershipOrderList({
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex justify-end gap-2" onClick={e => e.stopPropagation()}>
-                          {order.status === 'pending' && onReviewOrder && (
+                          {(order.status === 'pending' || order.status === 'paid') && onReviewOrder && (
                             <button
                               onClick={() => onReviewOrder(order)}
                               className="px-3 py-1 text-xs bg-primary text-white rounded-md hover:bg-primary/90 transition-colors shadow-sm"
@@ -300,7 +300,7 @@ export function MembershipOrderList({
                         </td>
                       </tr>
                     )}
-                  </>
+                  </React.Fragment>
                 );
               })}
             </tbody>
@@ -389,7 +389,7 @@ export function MembershipOrderList({
                         </div>
                       )}
 
-                      {order.status === 'pending' && onReviewOrder && (
+                      {(order.status === 'pending' || order.status === 'paid') && onReviewOrder && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();

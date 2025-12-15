@@ -28,7 +28,7 @@ interface MembershipOrder {
   memberLevel: 'vip' | 'svip';
   duration: number;
   price: number;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'paid' | 'approved' | 'rejected';
   paymentType: 'wechat' | 'alipay' | null;
   paymentScreenshot: string | null;
   transactionNote: string | null;

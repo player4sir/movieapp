@@ -47,7 +47,7 @@ const MEMBER_LEVEL_DEFAULTS: Record<MemberLevel, Partial<Omit<EffectivePermissio
     canWatch: true,
     canDownload: true,
     maxFavorites: 200,
-    adFree: true,
+    adFree: false,
     maxConcurrentStreams: 2,
     qualityLimit: 'hd',
   },
@@ -84,10 +84,10 @@ export function calculateEffectivePermissions(
 ): EffectivePermissions {
   // Start with user's member level
   const userMemberLevel = user.memberLevel;
-  
+
   // Get base permissions from user's member level
   const basePermissions = MEMBER_LEVEL_DEFAULTS[userMemberLevel];
-  
+
   // If no group permissions, return user-based permissions
   if (!groupPermissions || Object.keys(groupPermissions).length === 0) {
     return {
@@ -101,20 +101,20 @@ export function calculateEffectivePermissions(
       source: 'user',
     };
   }
-  
+
   // Determine effective member level (group overrides user if defined)
   const effectiveMemberLevel = groupPermissions.memberLevel ?? userMemberLevel;
-  
+
   // Get base permissions for the effective member level
   const effectiveBasePermissions = MEMBER_LEVEL_DEFAULTS[effectiveMemberLevel];
-  
+
   // Merge permissions: group permissions override base permissions when defined
   return {
     memberLevel: effectiveMemberLevel,
     canWatch: groupPermissions.canWatch ?? effectiveBasePermissions.canWatch ?? DEFAULT_PERMISSIONS.canWatch,
     canDownload: groupPermissions.canDownload ?? effectiveBasePermissions.canDownload ?? DEFAULT_PERMISSIONS.canDownload,
-    maxFavorites: groupPermissions.maxFavorites !== undefined 
-      ? groupPermissions.maxFavorites 
+    maxFavorites: groupPermissions.maxFavorites !== undefined
+      ? groupPermissions.maxFavorites
       : (effectiveBasePermissions.maxFavorites ?? DEFAULT_PERMISSIONS.maxFavorites),
     adFree: groupPermissions.adFree ?? effectiveBasePermissions.adFree ?? DEFAULT_PERMISSIONS.adFree,
     maxConcurrentStreams: groupPermissions.maxConcurrentStreams ?? effectiveBasePermissions.maxConcurrentStreams ?? DEFAULT_PERMISSIONS.maxConcurrentStreams,
@@ -151,11 +151,11 @@ export function getEffectiveMemberLevel(
   if (memberLevel === 'free') {
     return 'free';
   }
-  
+
   if (isMembershipExpired(memberExpiry)) {
     return 'free';
   }
-  
+
   return memberLevel;
 }
 
@@ -169,19 +169,19 @@ export function isValidGroupPermissions(permissions: unknown): permissions is Gr
   if (!permissions || typeof permissions !== 'object') {
     return true; // Empty/null is valid (no overrides)
   }
-  
+
   const p = permissions as Record<string, unknown>;
-  
+
   // Validate memberLevel if present
   if (p.memberLevel !== undefined && !['free', 'vip', 'svip'].includes(p.memberLevel as string)) {
     return false;
   }
-  
+
   // Validate qualityLimit if present
   if (p.qualityLimit !== undefined && !['sd', 'hd', '4k'].includes(p.qualityLimit as string)) {
     return false;
   }
-  
+
   // Validate boolean fields
   const booleanFields = ['canWatch', 'canDownload', 'adFree'];
   for (const field of booleanFields) {
@@ -189,7 +189,7 @@ export function isValidGroupPermissions(permissions: unknown): permissions is Gr
       return false;
     }
   }
-  
+
   // Validate numeric fields
   const numericFields = ['maxFavorites', 'maxConcurrentStreams'];
   for (const field of numericFields) {
@@ -197,7 +197,7 @@ export function isValidGroupPermissions(permissions: unknown): permissions is Gr
       return false;
     }
   }
-  
+
   return true;
 }
 
@@ -211,10 +211,10 @@ export function parseGroupPermissions(json: unknown): GroupPermissions {
   if (!json || typeof json !== 'object') {
     return {};
   }
-  
+
   if (!isValidGroupPermissions(json)) {
     return {};
   }
-  
+
   return json as GroupPermissions;
 }

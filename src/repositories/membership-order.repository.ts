@@ -38,8 +38,17 @@ export interface OrderListParams {
   sortOrder?: 'asc' | 'desc';
 }
 
+
+export interface MembershipOrderWithUser extends MembershipOrder {
+  user?: {
+    id: string;
+    username: string;
+    nickname: string | null;
+  } | null;
+}
+
 export interface OrderListResult {
-  data: MembershipOrder[];
+  data: MembershipOrderWithUser[];
   pagination: {
     page: number;
     pageSize: number;
@@ -216,6 +225,15 @@ export class MembershipOrderRepository extends BaseRepository {
           orderBy: sortOrder === 'desc'
             ? [desc(membershipOrders[sortBy])]
             : [membershipOrders[sortBy]],
+          with: {
+            user: {
+              columns: {
+                id: true,
+                username: true,
+                nickname: true,
+              },
+            },
+          },
         }),
         this.db.select({ count: sql<number>`count(*)` })
           .from(membershipOrders)

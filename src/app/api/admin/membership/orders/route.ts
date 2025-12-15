@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     const sortOrder = (searchParams.get('sortOrder') || 'desc') as 'asc' | 'desc';
 
     // Validate status if provided
-    const validStatuses: OrderStatus[] = ['pending', 'approved', 'rejected'];
+    const validStatuses: OrderStatus[] = ['pending', 'paid', 'approved', 'rejected'];
     const validatedStatus = status && validStatuses.includes(status) ? status : undefined;
 
     const result = await listOrders({

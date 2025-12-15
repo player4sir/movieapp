@@ -11,7 +11,7 @@
 
 import { useState, useCallback } from 'react';
 
-type OrderStatus = 'pending' | 'approved' | 'rejected';
+type OrderStatus = 'pending' | 'paid' | 'approved' | 'rejected';
 type PaymentType = 'wechat' | 'alipay';
 type MemberLevel = 'vip' | 'svip';
 

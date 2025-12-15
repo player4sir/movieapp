@@ -239,8 +239,8 @@ export async function approveOrder(
     throw { ...ORDER_ERRORS.ORDER_NOT_FOUND };
   }
 
-  // Only allow approving pending orders
-  if (order.status !== 'pending') {
+  // Only allow approving pending or paid orders
+  if (order.status !== 'pending' && order.status !== 'paid') {
     throw { ...ORDER_ERRORS.ORDER_ALREADY_PROCESSED };
   }
 
@@ -284,8 +284,8 @@ export async function rejectOrder(
     throw { ...ORDER_ERRORS.ORDER_NOT_FOUND };
   }
 
-  // Only allow rejecting pending orders
-  if (order.status !== 'pending') {
+  // Only allow rejecting pending or paid orders
+  if (order.status !== 'pending' && order.status !== 'paid') {
     throw { ...ORDER_ERRORS.ORDER_ALREADY_PROCESSED };
   }
 
