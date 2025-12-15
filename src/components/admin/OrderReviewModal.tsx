@@ -228,8 +228,7 @@ export function OrderReviewModal({
               <div>
                 <span className="text-foreground/50">支付方式</span>
                 <p>
-                  {order.paymentType === 'wechat' ? '微信支付' :
-                    order.paymentType === 'alipay' ? '支付宝' : '-'}
+                  康讯支付
                 </p>
               </div>
               <div>

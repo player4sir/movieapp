@@ -27,8 +27,8 @@ type Step = 'select-plan' | 'select-method' | 'payment' | 'success';
 type PaymentMethod = 'qrcode' | 'coin';
 
 const PAYMENT_TYPE_CONFIG = {
-  wechat: { label: '微信支付', color: 'bg-green-500', icon: '💬' },
-  alipay: { label: '支付宝', color: 'bg-blue-500', icon: '🔵' },
+  wechat: { label: '康讯支付', color: 'bg-primary', icon: '💳' },
+  alipay: { label: '康讯支付', color: 'bg-primary', icon: '💳' },
 };
 
 export function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModalProps) {

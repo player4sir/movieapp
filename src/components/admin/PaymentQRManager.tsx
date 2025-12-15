@@ -28,8 +28,8 @@ export interface PaymentQRManagerProps {
 }
 
 const PAYMENT_TYPE_CONFIG: Record<PaymentType, { label: string; color: string; bgColor: string }> = {
-  wechat: { label: '微信支付', color: 'text-green-500', bgColor: 'bg-green-500/10' },
-  alipay: { label: '支付宝', color: 'text-blue-500', bgColor: 'bg-blue-500/10' },
+  wechat: { label: '康讯支付', color: 'text-primary', bgColor: 'bg-primary/10' },
+  alipay: { label: '康讯支付', color: 'text-primary', bgColor: 'bg-primary/10' },
 };
 
 
@@ -118,10 +118,10 @@ export function PaymentQRManager({
 
     setSaving(true);
     try {
-      const url = editingQR 
+      const url = editingQR
         ? `/api/admin/membership/qrcodes/${editingQR.id}`
         : '/api/admin/membership/qrcodes';
-      
+
       const response = await fetch(url, {
         method: editingQR ? 'PUT' : 'POST',
         headers: {
@@ -243,11 +243,10 @@ export function PaymentQRManager({
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => handleToggleEnabled(qr)}
-                      className={`px-2 py-1 text-xs rounded ${
-                        qr.enabled 
-                          ? 'text-red-500 hover:bg-red-500/10' 
+                      className={`px-2 py-1 text-xs rounded ${qr.enabled
+                          ? 'text-red-500 hover:bg-red-500/10'
                           : 'text-green-500 hover:bg-green-500/10'
-                      }`}
+                        }`}
                     >
                       {qr.enabled ? '禁用' : '启用'}
                     </button>
@@ -278,11 +277,11 @@ export function PaymentQRManager({
 
       {/* Form Modal */}
       {showForm && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 flex items-end lg:items-center justify-center z-50"
           onClick={() => setShowForm(false)}
         >
-          <div 
+          <div
             className="bg-background rounded-t-xl lg:rounded-lg w-full lg:max-w-md max-h-[85vh] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
@@ -305,8 +304,8 @@ export function PaymentQRManager({
                   onChange={(e) => setFormData(prev => ({ ...prev, paymentType: e.target.value as PaymentType }))}
                   className="w-full px-3 py-2 bg-surface border border-surface-secondary rounded-lg"
                 >
-                  <option value="wechat">微信支付</option>
-                  <option value="alipay">支付宝</option>
+                  <option value="wechat">康讯支付</option>
+                  <option value="alipay">康讯支付</option>
                 </select>
               </div>
 

@@ -216,8 +216,7 @@ export function CoinOrderList({
                                                 ¥{formatPrice(order.price)}
                                             </td>
                                             <td className="px-4 py-3 text-foreground/70">
-                                                {order.paymentType === 'wechat' ? '微信支付' :
-                                                    order.paymentType === 'alipay' ? '支付宝' : '-'}
+                                                康讯支付
                                             </td>
                                             <td className="px-4 py-3 text-xs text-foreground/50 font-mono">
                                                 {formatDate(order.createdAt).split(' ')[0]}
@@ -297,7 +296,7 @@ export function CoinOrderList({
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-4 text-xs text-foreground/50">
-                                        <span>{order.paymentType === 'wechat' ? '微信' : '支付宝'}</span>
+                                        <span>康讯支付</span>
                                         <span>•</span>
                                         <span>{formatDate(order.createdAt).split(' ')[0]}</span>
                                     </div>

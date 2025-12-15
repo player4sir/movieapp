@@ -19,7 +19,7 @@ interface MembershipOrder {
   memberLevel: 'vip' | 'svip';
   duration: number;
   price: number;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'paid' | 'approved' | 'rejected';
   paymentType: 'wechat' | 'alipay' | null;
   paymentScreenshot: string | null;
   transactionNote: string | null;
@@ -38,6 +38,11 @@ const STATUS_CONFIG = {
     label: '待审核',
     color: 'text-yellow-500',
     bgColor: 'bg-yellow-500/10',
+  },
+  paid: {
+    label: '待确认',
+    color: 'text-blue-500',
+    bgColor: 'bg-blue-500/10',
   },
   approved: {
     label: '已通过',
@@ -233,7 +238,7 @@ export function OrderHistory({ className = '' }: OrderHistoryProps) {
                   <div className="flex justify-between text-sm">
                     <span className="text-foreground/50">支付方式</span>
                     <span className="text-foreground/80">
-                      {order.paymentType === 'wechat' ? '微信支付' : '支付宝'}
+                      康讯支付
                     </span>
                   </div>
                 )}

@@ -642,7 +642,7 @@ export type UnlockType = 'purchase' | 'vip';
 export type SourceCategory = 'normal' | 'adult';
 
 // Order status enum values
-export type OrderStatus = 'pending' | 'approved' | 'rejected';
+export type OrderStatus = 'pending' | 'paid' | 'approved' | 'rejected';
 
 // Payment type enum values
 export type PaymentType = 'wechat' | 'alipay';

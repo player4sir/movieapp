@@ -33,8 +33,8 @@ interface RechargeModalProps {
 
 type Step = 'select-package' | 'select-method' | 'payment' | 'success';
 const PAYMENT_TYPE_CONFIG = {
-  wechat: { label: '微信支付', color: 'bg-green-500', icon: '💬' },
-  alipay: { label: '支付宝', color: 'bg-blue-500', icon: '🔵' },
+  wechat: { label: '康讯支付', color: 'bg-primary', icon: '💳' },
+  alipay: { label: '康讯支付', color: 'bg-primary', icon: '💳' },
 };
 
 export function RechargeModal({ isOpen, onClose, currentBalance = 0, onSuccess }: RechargeModalProps) {
