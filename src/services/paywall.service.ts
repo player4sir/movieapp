@@ -12,8 +12,11 @@ import {
   CoinTransactionRepository,
   UserRepository,
 } from '@/repositories';
+import { UserGroupRepository } from '@/repositories';
 import { SourceCategory, User, ContentAccess } from '@/db/schema';
 import { getConfig } from './config.service';
+import { calculateEffectivePermissions, parseGroupPermissions } from './permission.service';
+import type { MemberLevel } from '@/types/auth';
 
 // ============================================
 // Error Definitions
@@ -74,6 +77,10 @@ const CONFIG_KEYS = {
   NORMAL_PRICE: 'paywall_normal_price',
   ADULT_PRICE: 'paywall_adult_price',
   ENABLED: 'paywall_enabled',
+  VIP_DISCOUNT: 'paywall_vip_discount',
+  PREVIEW_PERCENTAGE: 'paywall_preview_percentage',
+  PREVIEW_MIN_SECONDS: 'paywall_preview_min_seconds',
+  PREVIEW_MAX_SECONDS: 'paywall_preview_max_seconds',
 } as const;
 
 // Default values if config not found
@@ -81,6 +88,10 @@ const DEFAULT_CONFIG = {
   normalPrice: 1,
   adultPrice: 10,
   enabled: true,
+  vipDiscount: 0.5, // 50% discount for VIP on adult content
+  previewPercentage: 0.25, // 25% of video duration
+  previewMinSeconds: 60, // Minimum 1 minute
+  previewMaxSeconds: 600, // Maximum 10 minutes
 };
 
 // ============================================
@@ -92,21 +103,64 @@ function generateId(): string {
 }
 
 /**
- * Check if user has active VIP membership.
+ * Get user's effective member level considering group permissions.
+ * Group permissions can override user's individual member level.
  */
-function isVipActive(user: User): boolean {
-  if (user.memberLevel === 'free') return false;
+async function getEffectiveMemberLevel(user: User & { group?: { permissions: unknown } | null }): Promise<MemberLevel> {
+  // Parse group permissions if user belongs to a group
+  const groupPermissions = user.group ? parseGroupPermissions(user.group.permissions) : null;
+
+  // Calculate effective permissions
+  const effectivePerms = calculateEffectivePermissions(
+    { memberLevel: user.memberLevel, memberExpiry: user.memberExpiry },
+    groupPermissions
+  );
+
+  return effectivePerms.memberLevel;
+}
+
+/**
+ * Check if user's membership (own or from group) has valid expiry.
+ * For group-granted memberships, we don't require expiry.
+ */
+function hasMembershipValidity(user: User, effectiveLevel: MemberLevel, hasGroupOverride: boolean): boolean {
+  // If the group grants the membership level, it's always valid (no expiry check)
+  if (hasGroupOverride) {
+    return true;
+  }
+
+  // For user's own membership, check expiry
+  if (effectiveLevel === 'free') return false;
   if (!user.memberExpiry) return false;
   return new Date(user.memberExpiry) > new Date();
 }
 
 /**
+ * Check if user has active VIP or higher membership.
+ */
+async function isVipActive(user: User & { group?: { permissions: unknown } | null }): Promise<boolean> {
+  const effectiveLevel = await getEffectiveMemberLevel(user);
+  if (effectiveLevel === 'free') return false;
+
+  // Check if group grants the membership
+  const groupPermissions = user.group ? parseGroupPermissions(user.group.permissions) : null;
+  const hasGroupOverride = !!groupPermissions?.memberLevel;
+
+  return hasMembershipValidity(user, effectiveLevel, hasGroupOverride);
+}
+
+/**
  * Check if user has active SVIP membership.
  */
-function isSvipActive(user: User): boolean {
-  if (user.memberLevel !== 'svip') return false;
-  if (!user.memberExpiry) return false;
-  return new Date(user.memberExpiry) > new Date();
+async function isSvipActive(user: User & { group?: { permissions: unknown } | null }): Promise<boolean> {
+  const effectiveLevel = await getEffectiveMemberLevel(user);
+  if (effectiveLevel !== 'svip') return false;
+
+  // Check if group grants the membership
+  const groupPermissions = user.group ? parseGroupPermissions(user.group.permissions) : null;
+  const hasGroupOverride = groupPermissions?.memberLevel === 'svip';
+
+  return hasMembershipValidity(user, effectiveLevel, hasGroupOverride);
 }
 
 // ============================================
@@ -116,13 +170,12 @@ function isSvipActive(user: User): boolean {
 const contentAccessRepository = new ContentAccessRepository();
 const coinRepository = new CoinRepository();
 const userRepository = new UserRepository();
+const groupRepository = new UserGroupRepository();
 
 /**
- * Get price for content based on source category.
- * 
- * Requirements: 1.2, 1.3
+ * Get base price for content based on source category.
  */
-export async function getPrice(sourceCategory: SourceCategory): Promise<number> {
+async function getBasePrice(sourceCategory: SourceCategory): Promise<number> {
   try {
     const configKey = sourceCategory === 'adult'
       ? CONFIG_KEYS.ADULT_PRICE
@@ -134,6 +187,39 @@ export async function getPrice(sourceCategory: SourceCategory): Promise<number> 
   } catch {
     return sourceCategory === 'adult' ? DEFAULT_CONFIG.adultPrice : DEFAULT_CONFIG.normalPrice;
   }
+}
+
+/**
+ * Get VIP discount rate (0-1, where 0.5 = 50% discount)
+ */
+async function getVipDiscount(): Promise<number> {
+  try {
+    const config = await getConfig(CONFIG_KEYS.VIP_DISCOUNT);
+    return typeof config.value === 'number' ? config.value : DEFAULT_CONFIG.vipDiscount;
+  } catch {
+    return DEFAULT_CONFIG.vipDiscount;
+  }
+}
+
+/**
+ * Get price for content based on source category and member level.
+ * VIP users get a discount on adult content.
+ * 
+ * Requirements: 1.2, 1.3
+ */
+export async function getPrice(
+  sourceCategory: SourceCategory,
+  memberLevel?: MemberLevel
+): Promise<number> {
+  const basePrice = await getBasePrice(sourceCategory);
+
+  // VIP gets discount on adult content only
+  if (memberLevel === 'vip' && sourceCategory === 'adult') {
+    const discount = await getVipDiscount();
+    return Math.ceil(basePrice * (1 - discount));
+  }
+
+  return basePrice;
 }
 
 /**
@@ -149,6 +235,73 @@ export async function isPaywallEnabled(): Promise<boolean> {
 }
 
 /**
+ * Preview configuration interface
+ */
+export interface PreviewConfig {
+  percentage: number;  // 0-1, e.g., 0.25 = 25%
+  minSeconds: number;  // Minimum preview duration
+  maxSeconds: number;  // Maximum preview duration
+}
+
+/**
+ * Get preview configuration from database or defaults
+ */
+export async function getPreviewConfig(): Promise<PreviewConfig> {
+  try {
+    const [percentageConfig, minConfig, maxConfig] = await Promise.all([
+      getConfig(CONFIG_KEYS.PREVIEW_PERCENTAGE).catch(() => null),
+      getConfig(CONFIG_KEYS.PREVIEW_MIN_SECONDS).catch(() => null),
+      getConfig(CONFIG_KEYS.PREVIEW_MAX_SECONDS).catch(() => null),
+    ]);
+
+    return {
+      percentage: typeof percentageConfig?.value === 'number'
+        ? percentageConfig.value
+        : DEFAULT_CONFIG.previewPercentage,
+      minSeconds: typeof minConfig?.value === 'number'
+        ? minConfig.value
+        : DEFAULT_CONFIG.previewMinSeconds,
+      maxSeconds: typeof maxConfig?.value === 'number'
+        ? maxConfig.value
+        : DEFAULT_CONFIG.previewMaxSeconds,
+    };
+  } catch {
+    return {
+      percentage: DEFAULT_CONFIG.previewPercentage,
+      minSeconds: DEFAULT_CONFIG.previewMinSeconds,
+      maxSeconds: DEFAULT_CONFIG.previewMaxSeconds,
+    };
+  }
+}
+
+/**
+ * Calculate preview duration based on video total duration
+ * Formula: min(max(totalDuration * percentage, minSeconds), maxSeconds)
+ * 
+ * @param totalDuration - Total video duration in seconds
+ * @param config - Optional preview config (will fetch if not provided)
+ * @returns Preview duration in seconds
+ */
+export async function calculatePreviewDuration(
+  totalDuration: number,
+  config?: PreviewConfig
+): Promise<number> {
+  const previewConfig = config || await getPreviewConfig();
+
+  // Calculate percentage-based duration
+  const percentageDuration = Math.floor(totalDuration * previewConfig.percentage);
+
+  // Apply min/max limits
+  const duration = Math.min(
+    Math.max(percentageDuration, previewConfig.minSeconds),
+    previewConfig.maxSeconds
+  );
+
+  // Don't exceed total duration
+  return Math.min(duration, totalDuration);
+}
+
+/**
  * Check user's access to specific content.
  * Determines access type based on VIP status or purchase history.
  * 
@@ -160,10 +313,19 @@ export async function checkAccess(
   episodeIndex: number,
   sourceCategory: SourceCategory
 ): Promise<AccessResult> {
-  // Get user info
+  // Get user info with group relation for permission calculation
   const user = await userRepository.findById(userId);
   if (!user) {
     throw { ...PAYWALL_ERRORS.USER_NOT_FOUND };
+  }
+
+  // Fetch group details if user belongs to a group
+  let userWithGroup: User & { group?: { permissions: unknown } | null } = { ...user, group: null };
+  if (user.groupId) {
+    const group = await groupRepository.findById(user.groupId);
+    if (group) {
+      userWithGroup = { ...user, group: { permissions: group.permissions } };
+    }
   }
 
   // Check if paywall is enabled
@@ -175,8 +337,8 @@ export async function checkAccess(
     };
   }
 
-  // Check SVIP access - SVIP can access all content
-  if (isSvipActive(user)) {
+  // Check SVIP access - SVIP can access all content (including adult)
+  if (await isSvipActive(userWithGroup)) {
     return {
       hasAccess: true,
       accessType: 'vip',
@@ -184,7 +346,8 @@ export async function checkAccess(
   }
 
   // Check VIP access - VIP can access normal content only
-  if (isVipActive(user) && sourceCategory === 'normal') {
+  const isVip = await isVipActive(userWithGroup);
+  if (isVip && sourceCategory === 'normal') {
     return {
       hasAccess: true,
       accessType: 'vip',
@@ -207,7 +370,9 @@ export async function checkAccess(
   }
 
   // No access - return locked status with price
-  const price = await getPrice(sourceCategory);
+  // VIP gets discount on adult content
+  const effectiveLevel = await getEffectiveMemberLevel(userWithGroup);
+  const price = await getPrice(sourceCategory, effectiveLevel);
 
   return {
     hasAccess: false,
@@ -251,8 +416,18 @@ export async function unlockContent(
     throw { ...PAYWALL_ERRORS.ALREADY_UNLOCKED };
   }
 
-  // Get price
-  const price = await getPrice(sourceCategory);
+  // Get user's effective member level with group permissions
+  let userWithGroup: User & { group?: { permissions: unknown } | null } = { ...user, group: null };
+  if (user.groupId) {
+    const group = await groupRepository.findById(user.groupId);
+    if (group) {
+      userWithGroup = { ...user, group: { permissions: group.permissions } };
+    }
+  }
+  const effectiveLevel = await getEffectiveMemberLevel(userWithGroup);
+
+  // Get price (VIP gets discount on adult content)
+  const price = await getPrice(sourceCategory, effectiveLevel);
 
   // Get current balance
   const currentBalance = await coinRepository.getOrCreate(userId, generateId());

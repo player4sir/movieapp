@@ -7,6 +7,7 @@ import { CoinsProvider } from '@/contexts/CoinsContext';
 import { SplashAdWrapper } from '@/components/ads';
 import { setupGlobalFetchInterceptor } from '@/lib/api-client';
 import { ReferralTracker } from '@/components/referral/ReferralTracker';
+import { SiteTitle } from '@/components/layout';
 
 // Global fetcher for SWR - defined inline to avoid circular dependencies
 const globalFetcher = async (url: string) => {
@@ -49,6 +50,7 @@ export function Providers({ children }: { children: ReactNode }) {
     <SWRConfig value={swrValue}>
       <AuthProvider>
         <CoinsProvider>
+          <SiteTitle />
           {children}
           <SplashAdWrapper />
           <Suspense fallback={null}>

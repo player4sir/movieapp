@@ -15,9 +15,9 @@ interface VODGridProps {
 
 export const VODGrid = memo(function VODGrid({ items, loading = false, columns = 2, sourceCategory }: VODGridProps) {
   const gridCols = useMemo(() => ({
-    2: 'grid-cols-2',
-    3: 'grid-cols-3',
-    4: 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4',
+    2: 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6',
+    3: 'grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6',
+    4: 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6',
   }), []);
 
   if (loading && items.length === 0) {
@@ -44,9 +44,9 @@ export const VODGrid = memo(function VODGrid({ items, loading = false, columns =
   return (
     <div className={`grid ${gridCols[columns]} gap-3 p-4`}>
       {items.map((vod, index) => (
-        <VODCard 
-          key={vod.vod_id} 
-          vod={vod} 
+        <VODCard
+          key={vod.vod_id}
+          vod={vod}
           priority={index < 4}
           sourceCategory={sourceCategory}
         />

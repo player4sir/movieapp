@@ -234,6 +234,21 @@ export const coinConfigs = pgTable('CoinConfig', {
   index('CoinConfig_key_idx').on(table.key),
 ]);
 
+// ============================================
+// Site Settings Table (Global site configuration)
+// ============================================
+
+export const siteSettings = pgTable('SiteSettings', {
+  id: text('id').primaryKey(),
+  key: text('key').notNull().unique(),
+  value: text('value').notNull(),
+  description: text('description').default('').notNull(),
+  updatedAt: timestamp('updatedAt').notNull(),
+  updatedBy: text('updatedBy'),
+}, (table) => [
+  index('SiteSettings_key_idx').on(table.key),
+]);
+
 export const userCheckins = pgTable('UserCheckin', {
   id: text('id').primaryKey(),
   userId: text('userId').notNull(),
@@ -590,6 +605,7 @@ export type VideoSource = InferSelectModel<typeof videoSources>;
 export type UserCoinBalance = InferSelectModel<typeof userCoinBalances>;
 export type CoinTransaction = InferSelectModel<typeof coinTransactions>;
 export type CoinConfig = InferSelectModel<typeof coinConfigs>;
+export type SiteSettings = InferSelectModel<typeof siteSettings>;
 export type UserCheckin = InferSelectModel<typeof userCheckins>;
 export type ContentAccess = InferSelectModel<typeof contentAccess>;
 export type MembershipPlan = InferSelectModel<typeof membershipPlans>;
@@ -608,6 +624,7 @@ export type NewVideoSource = InferInsertModel<typeof videoSources>;
 export type NewUserCoinBalance = InferInsertModel<typeof userCoinBalances>;
 export type NewCoinTransaction = InferInsertModel<typeof coinTransactions>;
 export type NewCoinConfig = InferInsertModel<typeof coinConfigs>;
+export type NewSiteSettings = InferInsertModel<typeof siteSettings>;
 export type NewUserCheckin = InferInsertModel<typeof userCheckins>;
 export type NewContentAccess = InferInsertModel<typeof contentAccess>;
 export type NewMembershipPlan = InferInsertModel<typeof membershipPlans>;

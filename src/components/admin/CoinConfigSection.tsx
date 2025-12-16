@@ -5,10 +5,6 @@ import { RechargePackageEditor, RechargePackage } from './RechargePackageEditor'
 import { VipExchangeRateEditor, VipExchangeRate } from './VipExchangeRateEditor';
 import { api } from '@/lib/api-client';
 
-/**
- * Coin configuration value from API
- * Requirements: 5.1
- */
 export interface CoinConfigValue {
   key: string;
   value: unknown;
@@ -21,28 +17,21 @@ export interface CoinConfigSectionProps {
   onShowToast?: (message: string, type: 'success' | 'error') => void;
 }
 
-/**
- * Configuration display labels
- */
 const CONFIG_LABELS: Record<string, string> = {
-  checkin_base_reward: '签到基础奖励',
+  checkin_base_reward: '基础奖励',
   checkin_streak_bonus: '连续签到奖励',
-  checkin_streak_max: '连续签到最大天数',
+  checkin_streak_max: '最大连续天数',
   vip_exchange_rate: 'VIP兑换比例',
   recharge_packages: '充值套餐',
   referral_reward_inviter: '邀请人奖励',
   referral_reward_invitee: '新人奖励',
 };
 
-// Configs that should use special editors instead of JSON
-const SPECIAL_EDITORS = ['recharge_packages', 'vip_exchange_rate'];
+const CONFIG_GROUPS = {
+  checkin: { title: '签到奖励', keys: ['checkin_base_reward', 'checkin_streak_bonus', 'checkin_streak_max'] },
+  referral: { title: '推广奖励', keys: ['referral_reward_inviter', 'referral_reward_invitee'] },
+};
 
-/**
- * CoinConfigSection Component
- * Displays and allows editing of coin system configurations.
- * 
- * Requirements: 5.1, 5.2, 5.3, 5.4
- */
 export function CoinConfigSection({ onShowToast }: CoinConfigSectionProps) {
   const [configs, setConfigs] = useState<CoinConfigValue[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,30 +41,18 @@ export function CoinConfigSection({ onShowToast }: CoinConfigSectionProps) {
   const [saving, setSaving] = useState(false);
 
   const showToast = useCallback((message: string, type: 'success' | 'error') => {
-    if (onShowToast) {
-      onShowToast(message, type);
-    }
+    if (onShowToast) onShowToast(message, type);
   }, [onShowToast]);
 
-  /**
-   * Fetch all coin configurations
-   * Requirements: 5.1
-   */
   const fetchConfigs = useCallback(async () => {
     setLoading(true);
     setError(null);
-
-    const { data, error: apiError } = await api.get<{ configs: CoinConfigValue[] }>(
-      '/api/admin/coins/config'
-    );
-
-    // 401 会自动跳转到登录页，这里只处理其他错误
+    const { data, error: apiError } = await api.get<{ configs: CoinConfigValue[] }>('/api/admin/coins/config');
     if (apiError) {
       setError(apiError);
     } else if (data) {
       setConfigs(data.configs || []);
     }
-
     setLoading(false);
   }, []);
 
@@ -83,41 +60,22 @@ export function CoinConfigSection({ onShowToast }: CoinConfigSectionProps) {
     fetchConfigs();
   }, [fetchConfigs]);
 
-  /**
-   * Start editing a config
-   */
   const handleEdit = (config: CoinConfigValue) => {
     setEditingKey(config.key);
     setEditValue(formatValueForEdit(config.value));
   };
 
-  /**
-   * Cancel editing
-   */
   const handleCancel = () => {
     setEditingKey(null);
     setEditValue('');
   };
 
-  /**
-   * Save config changes
-   * Requirements: 5.2, 5.3, 5.4
-   */
   const handleSave = async (key: string) => {
     setSaving(true);
     try {
       const parsedValue = parseEditValue(key, editValue);
-
-      const { error: apiError } = await api.put(
-        '/api/admin/coins/config',
-        { key, value: parsedValue }
-      );
-
-      // 401 会自动跳转到登录页
-      if (apiError) {
-        throw new Error(apiError);
-      }
-
+      const { error: apiError } = await api.put('/api/admin/coins/config', { key, value: parsedValue });
+      if (apiError) throw new Error(apiError);
       showToast('配置已更新', 'success');
       setEditingKey(null);
       setEditValue('');
@@ -129,18 +87,13 @@ export function CoinConfigSection({ onShowToast }: CoinConfigSectionProps) {
     }
   };
 
-  /**
-   * Format value for display
-   */
   const formatValueForDisplay = (key: string, value: unknown): string => {
     if (key === 'vip_exchange_rate' && typeof value === 'object' && value !== null) {
       const rates = value as Record<string, number>;
-      return Object.entries(rates)
-        .map(([level, coins]) => `${level.toUpperCase()}: ${coins}金币`)
-        .join(', ');
+      return Object.entries(rates).map(([level, coins]) => `${level.toUpperCase()}: ${coins}`).join(' / ');
     }
     if (key === 'checkin_streak_bonus' && Array.isArray(value)) {
-      return value.map((v, i) => `第${i + 1}天: +${v}`).join(', ');
+      return value.map((v, i) => `第${i + 1}天+${v}`).join(', ');
     }
     if (key === 'recharge_packages' && Array.isArray(value)) {
       return `${value.length} 个套餐`;
@@ -148,21 +101,14 @@ export function CoinConfigSection({ onShowToast }: CoinConfigSectionProps) {
     return String(value);
   };
 
-  /**
-   * Format value for editing
-   */
   const formatValueForEdit = (value: unknown): string => {
-    if (typeof value === 'object') {
-      return JSON.stringify(value, null, 2);
-    }
+    if (typeof value === 'object') return JSON.stringify(value, null, 2);
     return String(value);
   };
 
-  /**
-   * Parse edited value back to proper type
-   */
   const parseEditValue = (key: string, value: string): unknown => {
-    if (key === 'checkin_base_reward' || key === 'checkin_streak_max') {
+    if (key === 'checkin_base_reward' || key === 'checkin_streak_max' ||
+      key === 'referral_reward_inviter' || key === 'referral_reward_invitee') {
       return parseInt(value, 10);
     }
     if (key === 'checkin_streak_bonus' || key === 'vip_exchange_rate' || key === 'recharge_packages') {
@@ -171,52 +117,11 @@ export function CoinConfigSection({ onShowToast }: CoinConfigSectionProps) {
     return value;
   };
 
-  if (loading) {
-    return (
-      <div className="bg-surface rounded-lg p-4 lg:p-6">
-        <div className="h-6 w-28 bg-surface-secondary/50 rounded animate-pulse mb-4" />
-        <div className="space-y-3">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="p-3 bg-surface-secondary/30 rounded-lg">
-              <div className="h-4 w-24 bg-surface-secondary/50 rounded animate-pulse mb-2" />
-              <div className="h-5 w-48 bg-surface-secondary/50 rounded animate-pulse" />
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-surface rounded-lg p-4 lg:p-6">
-        <h2 className="text-base lg:text-lg font-semibold mb-4">金币配置</h2>
-        <div className="text-center py-6">
-          <p className="text-red-500 mb-3">{error}</p>
-          <button onClick={fetchConfigs} className="text-primary hover:underline">
-            重试
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  /**
-   * Save recharge packages using the special editor
-   */
   const handleSavePackages = async (packages: RechargePackage[]) => {
     setSaving(true);
     try {
-      const { error: apiError } = await api.put(
-        '/api/admin/coins/config',
-        { key: 'recharge_packages', value: packages }
-      );
-
-      // 401 会自动跳转到登录页
-      if (apiError) {
-        throw new Error(apiError);
-      }
-
+      const { error: apiError } = await api.put('/api/admin/coins/config', { key: 'recharge_packages', value: packages });
+      if (apiError) throw new Error(apiError);
       showToast('充值套餐已更新', 'success');
       fetchConfigs();
     } catch (e) {
@@ -226,21 +131,11 @@ export function CoinConfigSection({ onShowToast }: CoinConfigSectionProps) {
     }
   };
 
-  /**
-   * Save VIP exchange rates using the special editor
-   */
   const handleSaveVipRates = async (rates: VipExchangeRate) => {
     setSaving(true);
     try {
-      const { error: apiError } = await api.put(
-        '/api/admin/coins/config',
-        { key: 'vip_exchange_rate', value: rates }
-      );
-
-      if (apiError) {
-        throw new Error(apiError);
-      }
-
+      const { error: apiError } = await api.put('/api/admin/coins/config', { key: 'vip_exchange_rate', value: rates });
+      if (apiError) throw new Error(apiError);
       showToast('VIP兑换比例已更新', 'success');
       fetchConfigs();
     } catch (e) {
@@ -250,116 +145,127 @@ export function CoinConfigSection({ onShowToast }: CoinConfigSectionProps) {
     }
   };
 
-  // Separate configs into regular and special
-  const regularConfigs = configs.filter(c => !SPECIAL_EDITORS.includes(c.key));
-  const rechargeConfig = configs.find(c => c.key === 'recharge_packages');
-  const vipRateConfig = configs.find(c => c.key === 'vip_exchange_rate');
-
-  return (
-    <div className="bg-surface rounded-lg p-4 lg:p-6">
-      <h2 className="text-base lg:text-lg font-semibold mb-4">金币配置</h2>
-
-      {/* Regular Configs */}
-      <div className="space-y-3 mb-6">
-        {regularConfigs.map((config) => (
-          <div key={config.key} className="p-3 bg-surface-secondary/30 rounded-lg">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="font-medium text-sm">
-                    {CONFIG_LABELS[config.key] || config.key}
-                  </span>
-                </div>
-                <p className="text-xs text-foreground/50 mb-2">{config.description}</p>
-
-                {editingKey === config.key ? (
-                  <div className="space-y-2">
-                    {config.key === 'checkin_base_reward' || config.key === 'checkin_streak_max' ? (
-                      <input
-                        type="number"
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        className="w-full px-3 py-2 bg-background border border-surface-secondary rounded-lg text-sm"
-                        min="0"
-                      />
-                    ) : (
-                      <textarea
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        className="w-full px-3 py-2 bg-background border border-surface-secondary rounded-lg text-sm font-mono"
-                        rows={4}
-                      />
-                    )}
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleSave(config.key)}
-                        disabled={saving}
-                        className="px-3 py-1.5 text-sm bg-primary text-white rounded-lg disabled:opacity-50"
-                      >
-                        {saving ? '保存中...' : '保存'}
-                      </button>
-                      <button
-                        onClick={handleCancel}
-                        disabled={saving}
-                        className="px-3 py-1.5 text-sm text-foreground/60 hover:text-foreground"
-                      >
-                        取消
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-foreground/80 break-all">
-                    {formatValueForDisplay(config.key, config.value)}
-                  </p>
-                )}
-              </div>
-
-              {editingKey !== config.key && (
-                <button
-                  onClick={() => handleEdit(config)}
-                  className="text-sm text-primary hover:underline shrink-0"
-                >
-                  编辑
-                </button>
-              )}
-            </div>
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="p-4 bg-surface rounded-lg border border-border/50">
+            <div className="h-4 w-20 bg-surface-secondary/50 rounded animate-pulse mb-3" />
+            <div className="h-8 bg-surface-secondary/50 rounded animate-pulse" />
           </div>
         ))}
       </div>
+    );
+  }
 
-      {/* VIP Exchange Rate - Special Editor */}
+  if (error) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-red-500 mb-3">{error}</p>
+        <button onClick={fetchConfigs} className="text-primary hover:underline text-sm">重试</button>
+      </div>
+    );
+  }
+
+  const rechargeConfig = configs.find(c => c.key === 'recharge_packages');
+  const vipRateConfig = configs.find(c => c.key === 'vip_exchange_rate');
+
+  const renderConfigItem = (config: CoinConfigValue, isLast: boolean) => {
+    const isEditing = editingKey === config.key;
+    const isNumeric = ['checkin_base_reward', 'checkin_streak_max', 'referral_reward_inviter', 'referral_reward_invitee'].includes(config.key);
+
+    return (
+      <div key={config.key} className={`py-3 ${!isLast ? 'border-b border-border/20' : ''}`}>
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-sm font-medium">{CONFIG_LABELS[config.key] || config.key}</span>
+          {!isEditing && (
+            <button onClick={() => handleEdit(config)} className="text-xs text-primary hover:underline">
+              编辑
+            </button>
+          )}
+        </div>
+        <p className="text-xs text-foreground/40 mb-2">{config.description}</p>
+
+        {isEditing ? (
+          <div className="flex items-center gap-2">
+            <input
+              type={isNumeric ? 'number' : 'text'}
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              className="flex-1 px-3 py-2 text-sm bg-background border border-border rounded-lg outline-none focus:border-primary"
+              autoFocus
+            />
+            <button
+              onClick={() => handleSave(config.key)}
+              disabled={saving}
+              className="px-4 py-2 text-sm bg-primary text-white rounded-lg"
+            >
+              {saving ? '...' : '保存'}
+            </button>
+            <button onClick={handleCancel} className="px-3 py-2 text-sm text-foreground/40">取消</button>
+          </div>
+        ) : (
+          <span className="text-sm font-medium text-yellow-500">
+            {formatValueForDisplay(config.key, config.value)}
+          </span>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* 签到奖励 */}
+      <div className="bg-surface rounded-lg border border-border/50">
+        <div className="px-4 py-2 border-b border-border/30">
+          <span className="text-xs font-medium text-foreground/50 uppercase">{CONFIG_GROUPS.checkin.title}</span>
+        </div>
+        <div className="px-4">
+          {configs.filter(c => CONFIG_GROUPS.checkin.keys.includes(c.key)).map((c, i, arr) => renderConfigItem(c, i === arr.length - 1))}
+        </div>
+      </div>
+
+      {/* 推广奖励 */}
+      <div className="bg-surface rounded-lg border border-border/50">
+        <div className="px-4 py-2 border-b border-border/30">
+          <span className="text-xs font-medium text-foreground/50 uppercase">{CONFIG_GROUPS.referral.title}</span>
+        </div>
+        <div className="px-4">
+          {configs.filter(c => CONFIG_GROUPS.referral.keys.includes(c.key)).map((c, i, arr) => renderConfigItem(c, i === arr.length - 1))}
+        </div>
+      </div>
+
+      {/* VIP兑换 */}
       {vipRateConfig && (
-        <div className="p-3 bg-surface-secondary/30 rounded-lg mb-3">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="font-medium text-sm">VIP兑换比例</span>
+        <div className="bg-surface rounded-lg border border-border/50">
+          <div className="px-4 py-2 border-b border-border/30">
+            <span className="text-xs font-medium text-foreground/50 uppercase">VIP兑换</span>
           </div>
-          <p className="text-xs text-foreground/50 mb-3">{vipRateConfig.description}</p>
-          <VipExchangeRateEditor
-            rates={(vipRateConfig.value as VipExchangeRate) || { vip: 1000, svip: 3000 }}
-            onSave={handleSaveVipRates}
-            saving={saving}
-          />
+          <div className="p-4">
+            <VipExchangeRateEditor
+              rates={(vipRateConfig.value as VipExchangeRate) || { vip: 1000, svip: 3000 }}
+              onSave={handleSaveVipRates}
+              saving={saving}
+            />
+          </div>
         </div>
       )}
 
-      {/* Recharge Packages - Special Editor */}
+      {/* 充值套餐 */}
       {rechargeConfig && (
-        <div className="p-3 bg-surface-secondary/30 rounded-lg">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="font-medium text-sm">充值套餐</span>
+        <div className="bg-surface rounded-lg border border-border/50">
+          <div className="px-4 py-2 border-b border-border/30">
+            <span className="text-xs font-medium text-foreground/50 uppercase">充值套餐</span>
           </div>
-          <p className="text-xs text-foreground/50 mb-3">{rechargeConfig.description}</p>
-          <RechargePackageEditor
-            packages={(rechargeConfig.value as RechargePackage[]) || []}
-            onSave={handleSavePackages}
-            saving={saving}
-          />
+          <div className="p-4">
+            <RechargePackageEditor
+              packages={(rechargeConfig.value as RechargePackage[]) || []}
+              onSave={handleSavePackages}
+              saving={saving}
+            />
+          </div>
         </div>
       )}
-
-      <p className="text-xs text-foreground/40 mt-4">
-        提示：修改配置后将立即生效，请谨慎操作
-      </p>
     </div>
   );
 }

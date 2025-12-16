@@ -3,16 +3,19 @@
  * GET /api/user/favorites - List user favorites
  * POST /api/user/favorites - Add to favorites
  * 
- * Migrated from Prisma to Drizzle ORM using Repository pattern.
+ * Now enforces maxFavorites limit based on user group permissions.
  * Requirements: 3.1, 3.4, 6.1, 6.2
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, isAuthError } from '@/lib/auth-middleware';
-import { FavoriteRepository } from '@/repositories';
+import { FavoriteRepository, UserRepository, UserGroupRepository } from '@/repositories';
+import { calculateEffectivePermissions, parseGroupPermissions } from '@/services/permission.service';
 
-// Repository instance
+// Repository instances
 const favoriteRepository = new FavoriteRepository();
+const userRepository = new UserRepository();
+const groupRepository = new UserGroupRepository();
 
 /**
  * GET /api/user/favorites
@@ -22,7 +25,7 @@ const favoriteRepository = new FavoriteRepository();
  */
 export async function GET(request: NextRequest) {
   const authResult = await requireAuth(request);
-  
+
   if (isAuthError(authResult)) {
     return authResult;
   }
@@ -57,10 +60,11 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/user/favorites
  * Add a VOD to user's favorites
+ * Enforces maxFavorites limit based on user group permissions
  */
 export async function POST(request: NextRequest) {
   const authResult = await requireAuth(request);
-  
+
   if (isAuthError(authResult)) {
     return authResult;
   }
@@ -86,6 +90,53 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if already favorited (avoid counting twice)
+    const existingFavorite = await favoriteRepository.findByUserAndVod(user.id, vodId);
+    if (existingFavorite) {
+      // Already favorited, just return success
+      return NextResponse.json({ data: existingFavorite }, { status: 200 });
+    }
+
+    // Get user's effective maxFavorites permission
+    const userData = await userRepository.findById(user.id);
+    if (!userData) {
+      return NextResponse.json(
+        { code: 'USER_NOT_FOUND', message: '用户不存在' },
+        { status: 404 }
+      );
+    }
+
+    // Fetch group permissions
+    let groupPermissions = null;
+    if (userData.groupId) {
+      const group = await groupRepository.findById(userData.groupId);
+      if (group) {
+        groupPermissions = parseGroupPermissions(group.permissions);
+      }
+    }
+
+    // Calculate effective permissions
+    const effectivePerms = calculateEffectivePermissions(
+      { memberLevel: userData.memberLevel, memberExpiry: userData.memberExpiry },
+      groupPermissions
+    );
+
+    // Check maxFavorites limit (null means unlimited)
+    if (effectivePerms.maxFavorites !== null) {
+      const currentCount = await favoriteRepository.countByUser(user.id);
+      if (currentCount >= effectivePerms.maxFavorites) {
+        return NextResponse.json(
+          {
+            code: 'FAVORITE_LIMIT_EXCEEDED',
+            message: `收藏数量已达上限 (${effectivePerms.maxFavorites})`,
+            maxFavorites: effectivePerms.maxFavorites,
+            currentCount,
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     // Create favorite (upsert to handle duplicates gracefully)
     const favorite = await favoriteRepository.upsert({
       userId: user.id,
@@ -104,3 +155,4 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+

@@ -57,6 +57,7 @@ interface MembershipData {
   memberExpiry: string | null;
   isActive: boolean;
   daysRemaining: number;
+  isFromGroup: boolean; // 是否来自用户组
 }
 
 export default function ProfilePage() {
@@ -70,13 +71,31 @@ export default function ProfilePage() {
   const [checkinResult, setCheckinResult] = useState<{ coins: number; streak: number } | null>(null);
   const [debugClicks, setDebugClicks] = useState(0);
 
-  // Fetch membership status
+  // Fetch membership status using subscription API (includes group permissions)
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    fetch('/api/membership/status')
+    fetch('/api/user/subscription')
       .then(res => res.ok ? res.json() : null)
-      .then(data => data && setMembership(data))
+      .then(data => {
+        if (data) {
+          // Calculate days remaining if there's an expiry date
+          let daysRemaining = 0;
+          if (data.expiresAt) {
+            const expiry = new Date(data.expiresAt);
+            const now = new Date();
+            daysRemaining = Math.max(0, Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+          }
+
+          setMembership({
+            memberLevel: data.memberLevel || 'free',
+            memberExpiry: data.expiresAt,
+            isActive: data.isVip || data.isSvip || data.tier === 'admin',
+            daysRemaining,
+            isFromGroup: data.permissionSource === 'group', // 来自用户组
+          });
+        }
+      })
       .catch(() => { });
   }, [isAuthenticated]);
 
@@ -125,6 +144,20 @@ export default function ProfilePage() {
   const canCheckin = checkinStatus?.canCheckin ?? false;
   const streakCount = checkinStatus?.streakCount ?? 0;
 
+  // 生成会员状态文本
+  const getMembershipStatusText = () => {
+    if (memberLevel === 'free') {
+      return '开通会员享更多权益';
+    }
+    if (membership?.isFromGroup) {
+      return '永久会员'; // 用户组授权的永久有效
+    }
+    if (membership?.isActive && membership.daysRemaining > 0) {
+      return `剩余 ${membership.daysRemaining} 天`;
+    }
+    return <span className="text-red-400">会员已过期</span>;
+  };
+
   return (
     <div className="min-h-screen bg-background pb-20">
       {/* Header - with safe area padding for PWA */}
@@ -159,26 +192,22 @@ export default function ProfilePage() {
                 )}
               </div>
               <p className="text-xs text-foreground/50 mt-0.5">
-                {memberLevel === 'free' ? (
-                  '开通会员享更多权益'
-                ) : membership?.isActive && membership.daysRemaining > 0 ? (
-                  `剩余 ${membership.daysRemaining} 天`
-                ) : (
-                  <span className="text-red-400">会员已过期</span>
-                )}
+                {getMembershipStatusText()}
               </p>
             </div>
 
-            {/* Upgrade Button */}
-            <button
-              onClick={() => setShowMembership(true)}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all active:scale-95 ${memberLevel === 'free'
-                ? 'bg-primary text-white'
-                : 'bg-white/10 text-foreground/80'
-                }`}
-            >
-              {memberLevel === 'free' ? '开通会员' : '续费'}
-            </button>
+            {/* Upgrade Button - hide for group members */}
+            {!membership?.isFromGroup && (
+              <button
+                onClick={() => setShowMembership(true)}
+                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all active:scale-95 ${memberLevel === 'free'
+                  ? 'bg-primary text-white'
+                  : 'bg-white/10 text-foreground/80'
+                  }`}
+              >
+                {memberLevel === 'free' ? '开通会员' : '续费'}
+              </button>
+            )}
           </div>
 
           {/* Coins & Checkin Row */}
@@ -334,7 +363,7 @@ export default function ProfilePage() {
         isOpen={showMembership}
         onClose={() => setShowMembership(false)}
       />
-    </div>
+    </div >
   );
 }
 

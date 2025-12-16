@@ -386,52 +386,54 @@ function UsersTab() {
 
   return (
     <>
-      {/* Filter Panel (Requirements 4.1, 4.2, 5.1) */}
-      <div className="mb-4">
-        <FilterPanel
-          filters={filters}
-          groups={groupSummaries}
-          onChange={handleFilterChange}
-          onClear={handleClearFilters}
-          activeCount={activeFilterCount}
-          onManageGroups={handleManageGroups}
-        />
-      </div>
-
-      {/* Selection mode toggle and select all */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setIsCreateOpen(true)}
-            className="btn-primary px-3 py-1.5 text-sm flex items-center gap-2"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            新建用户
-          </button>
-          <div className="w-px h-4 bg-foreground/10 mx-1"></div>
-          <button
-            onClick={() => setIsSelectMode(!isSelectMode)}
-            className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${isSelectMode
-              ? 'bg-primary text-white'
-              : 'bg-surface-secondary text-foreground/70 hover:text-foreground'
-              }`}
-          >
-            {isSelectMode ? '退出选择' : '批量操作'}
-          </button>
-          {isSelectMode && users.length > 0 && (
-            <button
-              onClick={handleSelectAll}
-              className="text-sm text-primary hover:underline"
-            >
-              {selectedUserIds.size === users.length ? '取消全选' : '全选当前页'}
-            </button>
-          )}
+      {/* Fixed Header - Filter + Toolbar */}
+      <div className="sticky top-0 z-10 bg-background pb-2">
+        {/* Filter Panel */}
+        <div className="mb-3">
+          <FilterPanel
+            filters={filters}
+            groups={groupSummaries}
+            onChange={handleFilterChange}
+            onClear={handleClearFilters}
+            activeCount={activeFilterCount}
+            onManageGroups={handleManageGroups}
+          />
         </div>
-        <span className="text-sm text-foreground/50">
-          共 {pagination.total} 个用户
-        </span>
+
+        {/* Toolbar: Selection mode + actions */}
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsCreateOpen(true)}
+              className="btn-primary px-3 py-1.5 text-sm flex items-center gap-1.5"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              新建
+            </button>
+            <button
+              onClick={() => setIsSelectMode(!isSelectMode)}
+              className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${isSelectMode
+                ? 'bg-primary text-white'
+                : 'bg-surface-secondary text-foreground/70 hover:text-foreground'
+                }`}
+            >
+              {isSelectMode ? '退出' : '批量'}
+            </button>
+            {isSelectMode && users.length > 0 && (
+              <button
+                onClick={handleSelectAll}
+                className="text-sm text-primary hover:underline"
+              >
+                {selectedUserIds.size === users.length ? '取消全选' : '全选'}
+              </button>
+            )}
+          </div>
+          <span className="text-xs text-foreground/50">
+            {pagination.total} 用户
+          </span>
+        </div>
       </div>
 
       {/* Error State with Retry (Requirements 5.5) */}
@@ -474,31 +476,30 @@ function UsersTab() {
         </div>
       ) : (
         <div className="bg-surface rounded-lg overflow-hidden border border-border/50">
-          {/* Desktop Table View */}
+          {/* Desktop Table View - Compact Design */}
           <div className="hidden lg:block overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-surface-secondary/50 text-foreground/60 font-medium border-b border-border/50">
+              <thead className="bg-surface-secondary/50 text-foreground/60 text-xs font-medium border-b border-border/50 sticky top-0">
                 <tr>
-                  <th className="px-4 py-3 w-10">
+                  <th className="px-3 py-2 w-8">
                     {isSelectMode && (
                       <input
                         type="checkbox"
                         checked={selectedUserIds.size === users.length && users.length > 0}
                         onChange={handleSelectAll}
-                        className="w-4 h-4 rounded border-foreground/30 text-primary focus:ring-primary"
+                        className="w-3.5 h-3.5 rounded border-foreground/30 text-primary focus:ring-primary"
                       />
                     )}
                   </th>
-                  <th className="px-4 py-3">用户名</th>
-                  <th className="px-4 py-3">昵称</th>
-                  <th className="px-4 py-3">用户组</th>
-                  <th className="px-4 py-3">会员等级</th>
-                  <th className="px-4 py-3">状态</th>
-                  <th className="px-4 py-3">最后登录</th>
-                  <th className="px-4 py-3 text-right">操作</th>
+                  <th className="px-3 py-2">用户</th>
+                  <th className="px-3 py-2">用户组</th>
+                  <th className="px-3 py-2 w-16 text-center">等级</th>
+                  <th className="px-3 py-2 w-16 text-center">状态</th>
+                  <th className="px-3 py-2 w-24">最后登录</th>
+                  <th className="px-3 py-2 w-16 text-right">操作</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border/30">
+              <tbody className="divide-y divide-border/20">
                 {users.map((user) => (
                   <tr
                     key={`table-${user.id}`}
@@ -509,66 +510,71 @@ function UsersTab() {
                         setIsDetailOpen(true);
                       }
                     }}
-                    className={`hover:bg-surface-secondary/30 transition-colors cursor-pointer ${selectedUserIds.has(user.id) ? 'bg-primary/5' : ''
-                      }`}
+                    className={`hover:bg-surface-secondary/30 transition-colors cursor-pointer ${selectedUserIds.has(user.id) ? 'bg-primary/5' : ''}`}
                   >
-                    <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                    <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
                       {isSelectMode && (
                         <input
                           type="checkbox"
                           checked={selectedUserIds.has(user.id)}
                           onChange={() => handleSelectUser(user.id)}
-                          className="w-4 h-4 rounded border-foreground/30 text-primary focus:ring-primary"
+                          className="w-3.5 h-3.5 rounded border-foreground/30 text-primary focus:ring-primary"
                           disabled={user.role === 'admin'}
                         />
                       )}
                     </td>
-                    <td className="px-4 py-3 font-medium">
+                    <td className="px-3 py-2">
                       <div className="flex items-center gap-2">
-                        {user.username}
-                        {user.role === 'admin' && (
-                          <span className="bg-primary/10 text-primary px-1.5 py-0.5 rounded text-[10px] font-bold uppercase">
-                            Admin
-                          </span>
-                        )}
+                        <div className="w-7 h-7 rounded-full bg-surface-secondary flex items-center justify-center text-xs font-medium text-foreground/60 flex-shrink-0">
+                          {(user.nickname || user.username)?.[0]?.toUpperCase() || 'U'}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-medium truncate">{user.username}</span>
+                            {user.role === 'admin' && (
+                              <span className="bg-primary/15 text-primary px-1 py-0.5 rounded text-[9px] font-bold uppercase flex-shrink-0">
+                                Admin
+                              </span>
+                            )}
+                          </div>
+                          {user.nickname && user.nickname !== user.username && (
+                            <div className="text-xs text-foreground/40 truncate">{user.nickname}</div>
+                          )}
+                        </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-foreground/70">{user.nickname || '-'}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-2">
                       {user.group ? (
-                        <span className="flex items-center gap-1.5">
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs" style={{ backgroundColor: `${user.group.color}15`, color: user.group.color }}>
                           <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: user.group.color }}></span>
                           {user.group.name}
                         </span>
-                      ) : <span className="text-foreground/30">-</span>}
+                      ) : <span className="text-foreground/20 text-xs">-</span>}
                     </td>
-                    <td className="px-4 py-3"><MemberBadge level={user.memberLevel} /></td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${user.status === 'active' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'
-                        }`}>
-                        {user.status === 'active' ? '正常' : '禁用'}
-                      </span>
+                    <td className="px-3 py-2 text-center"><MemberBadge level={user.memberLevel} /></td>
+                    <td className="px-3 py-2 text-center">
+                      <span className={`inline-block w-2 h-2 rounded-full ${user.status === 'active' ? 'bg-green-500' : 'bg-red-500'}`} title={user.status === 'active' ? '正常' : '禁用'}></span>
                     </td>
-                    <td className="px-4 py-3 text-foreground/50 text-xs font-mono">
-                      {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString() : '-'}
+                    <td className="px-3 py-2 text-foreground/40 text-xs">
+                      {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }) : '-'}
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-3 py-2 text-right">
                       {!isSelectMode && (
-                        <div className="flex justify-end gap-1" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-end gap-0.5" onClick={e => e.stopPropagation()}>
                           <button
                             onClick={() => setEditingUser(user)}
-                            className="p-1.5 text-foreground/50 hover:text-primary hover:bg-primary/10 rounded transition-colors"
+                            className="p-1 text-foreground/40 hover:text-primary hover:bg-primary/10 rounded transition-colors"
                             title="编辑"
                           >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                           </button>
                           {user.role !== 'admin' && (
                             <button
                               onClick={() => handleDeleteUser(user.id)}
-                              className="p-1.5 text-foreground/50 hover:text-red-500 hover:bg-red-500/10 rounded transition-colors"
+                              className="p-1 text-foreground/40 hover:text-red-500 hover:bg-red-500/10 rounded transition-colors"
                               title="删除"
                             >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                             </button>
                           )}
                         </div>
@@ -590,83 +596,67 @@ function UsersTab() {
                   setDetailUserId(user.id);
                   setIsDetailOpen(true);
                 }}
-                className={`group relative flex flex-col items-start gap-4 p-5 transition-all cursor-pointer ${selectedUserIds.has(user.id)
-                  ? 'bg-primary/5'
-                  : 'bg-surface hover:bg-surface-secondary/30'
-                  }`}
+                className={`flex items-center gap-3 px-3 py-2.5 transition-all cursor-pointer ${selectedUserIds.has(user.id) ? 'bg-primary/5' : 'hover:bg-surface-secondary/30'}`}
               >
                 {/* Checkbox */}
                 {isSelectMode && (
-                  <div className="absolute top-5 right-5">
-                    <input
-                      type="checkbox"
-                      checked={selectedUserIds.has(user.id)}
-                      onChange={() => handleSelectUser(user.id)}
-                      className="w-5 h-5 rounded border-foreground/30 text-primary focus:ring-primary"
-                      disabled={user.role === 'admin'}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  </div>
+                  <input
+                    type="checkbox"
+                    checked={selectedUserIds.has(user.id)}
+                    onChange={() => handleSelectUser(user.id)}
+                    className="w-4 h-4 rounded border-foreground/30 text-primary focus:ring-primary flex-shrink-0"
+                    disabled={user.role === 'admin'}
+                    onClick={(e) => e.stopPropagation()}
+                  />
                 )}
 
-                {/* User Info */}
-                <div className="w-full">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-lg font-semibold truncate text-foreground/90">{user.username}</span>
-                    {user.role === 'admin' && (
-                      <span className="bg-primary/10 text-primary px-2 py-0.5 rounded text-[10px] font-bold tracking-wide uppercase">
-                        Admin
-                      </span>
-                    )}
-                  </div>
+                {/* Avatar */}
+                <div className="w-8 h-8 rounded-full bg-surface-secondary flex items-center justify-center text-xs font-medium text-foreground/60 flex-shrink-0">
+                  {(user.nickname || user.username)?.[0]?.toUpperCase() || 'U'}
+                </div>
 
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-foreground/50">
-                    <span className="flex items-center gap-1">
-                      {user.nickname || '无昵称'}
-                    </span>
-                    <span className="w-1 h-1 rounded-full bg-foreground/20"></span>
+                {/* User Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <span className="font-medium text-sm truncate">{user.username}</span>
+                    {user.role === 'admin' && (
+                      <span className="bg-primary/15 text-primary px-1 py-0.5 rounded text-[8px] font-bold uppercase flex-shrink-0">Admin</span>
+                    )}
+                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${user.status === 'active' ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-foreground/50">
+                    {user.nickname && user.nickname !== user.username && (
+                      <span className="truncate max-w-[80px]">{user.nickname}</span>
+                    )}
                     <MemberBadge level={user.memberLevel} />
                     {user.group && (
-                      <>
-                        <span className="w-1 h-1 rounded-full bg-foreground/20"></span>
-                        <span className="flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: user.group.color }}></span>
-                          {user.group.name}
-                        </span>
-                      </>
-                    )}
-                  </div>
-
-                  <div className="mt-3 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${user.status === 'active' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'
-                        }`}>
-                        {user.status === 'active' ? '● 正常' : '● 禁用'}
+                      <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[10px]" style={{ backgroundColor: `${user.group.color}20`, color: user.group.color }}>
+                        <span className="w-1 h-1 rounded-full" style={{ backgroundColor: user.group.color }}></span>
+                        {user.group.name}
                       </span>
-                      <span className="text-xs text-foreground/30 font-mono">ID: {user.id.slice(0, 8)}...</span>
-                    </div>
-
-                    {/* Mobile Actions */}
-                    {!isSelectMode && (
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setEditingUser(user); }}
-                          className="p-2 text-foreground/40 hover:text-primary bg-surface-secondary/50 rounded-lg"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                        </button>
-                        {user.role !== 'admin' && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleDeleteUser(user.id); }}
-                            className="p-2 text-foreground/40 hover:text-red-500 bg-surface-secondary/50 rounded-lg"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                          </button>
-                        )}
-                      </div>
                     )}
                   </div>
                 </div>
+
+                {/* Actions */}
+                {!isSelectMode && (
+                  <div className="flex items-center gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
+                    <button
+                      onClick={() => setEditingUser(user)}
+                      className="p-1.5 text-foreground/30 hover:text-primary rounded"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                    </button>
+                    {user.role !== 'admin' && (
+                      <button
+                        onClick={() => handleDeleteUser(user.id)}
+                        className="p-1.5 text-foreground/30 hover:text-red-500 rounded"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -696,7 +686,8 @@ function UsersTab() {
             </button>
           </div>
         </div>
-      )}
+      )
+      }
 
       {/* Batch Operation Bar (Requirements 2.1, 5.1) */}
       <BatchOperationBar
@@ -752,83 +743,85 @@ function UsersTab() {
       />
 
       {/* Group List Modal (Requirements 1.1) */}
-      {showGroupList && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-end lg:items-center justify-center z-50"
-          onClick={() => setShowGroupList(false)}
-        >
+      {
+        showGroupList && (
           <div
-            className="bg-background rounded-t-xl lg:rounded-lg p-5 w-full lg:max-w-lg max-h-[80vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 bg-black/50 flex items-end lg:items-center justify-center z-50"
+            onClick={() => setShowGroupList(false)}
           >
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">用户组管理</h2>
+            <div
+              className="bg-background rounded-t-xl lg:rounded-lg p-5 w-full lg:max-w-lg max-h-[80vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">用户组管理</h2>
+                <button
+                  onClick={() => { setShowGroupList(false); setEditingGroup(null); setIsGroupModalOpen(true); }}
+                  className="btn-primary px-3 py-1.5 text-sm"
+                >
+                  新建
+                </button>
+              </div>
+
+              {groups.length === 0 ? (
+                <p className="text-center py-8 text-foreground/50">暂无用户组</p>
+              ) : (
+                <div className="space-y-3">
+                  {groups.map((g) => (
+                    <div key={g.id} className="p-3 bg-surface rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div
+                          className="w-3 h-3 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: g.color }}
+                        />
+                        <span className="font-medium flex-1">{g.name}</span>
+                        <span className="text-xs text-foreground/50">{g._count.users} 人</span>
+                      </div>
+                      {g.description && (
+                        <p className="text-sm text-foreground/60 mb-2 line-clamp-1">{g.description}</p>
+                      )}
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {g.permissions.memberLevel && (
+                          <span className="px-1.5 py-0.5 bg-surface-secondary text-foreground/60 text-xs rounded">
+                            会员: {g.permissions.memberLevel.toUpperCase()}
+                          </span>
+                        )}
+                        {g.permissions.adFree && (
+                          <span className="px-1.5 py-0.5 bg-surface-secondary text-foreground/60 text-xs rounded">免广告</span>
+                        )}
+                        {g.permissions.canDownload && (
+                          <span className="px-1.5 py-0.5 bg-surface-secondary text-foreground/60 text-xs rounded">可下载</span>
+                        )}
+                      </div>
+                      <div className="flex gap-2 text-sm">
+                        <button
+                          onClick={() => { setShowGroupList(false); setEditingGroup(g); setIsGroupModalOpen(true); }}
+                          className="text-primary hover:underline"
+                        >
+                          编辑
+                        </button>
+                        <button
+                          onClick={() => handleDeleteGroup(g.id)}
+                          className="text-red-500 hover:underline"
+                        >
+                          删除
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <button
-                onClick={() => { setShowGroupList(false); setEditingGroup(null); setIsGroupModalOpen(true); }}
-                className="btn-primary px-3 py-1.5 text-sm"
+                onClick={() => setShowGroupList(false)}
+                className="w-full mt-4 py-2.5 btn-secondary"
               >
-                新建
+                关闭
               </button>
             </div>
-
-            {groups.length === 0 ? (
-              <p className="text-center py-8 text-foreground/50">暂无用户组</p>
-            ) : (
-              <div className="space-y-3">
-                {groups.map((g) => (
-                  <div key={g.id} className="p-3 bg-surface rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div
-                        className="w-3 h-3 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: g.color }}
-                      />
-                      <span className="font-medium flex-1">{g.name}</span>
-                      <span className="text-xs text-foreground/50">{g._count.users} 人</span>
-                    </div>
-                    {g.description && (
-                      <p className="text-sm text-foreground/60 mb-2 line-clamp-1">{g.description}</p>
-                    )}
-                    <div className="flex flex-wrap gap-1 mb-2">
-                      {g.permissions.memberLevel && (
-                        <span className="px-1.5 py-0.5 bg-surface-secondary text-foreground/60 text-xs rounded">
-                          会员: {g.permissions.memberLevel.toUpperCase()}
-                        </span>
-                      )}
-                      {g.permissions.adFree && (
-                        <span className="px-1.5 py-0.5 bg-surface-secondary text-foreground/60 text-xs rounded">免广告</span>
-                      )}
-                      {g.permissions.canDownload && (
-                        <span className="px-1.5 py-0.5 bg-surface-secondary text-foreground/60 text-xs rounded">可下载</span>
-                      )}
-                    </div>
-                    <div className="flex gap-2 text-sm">
-                      <button
-                        onClick={() => { setShowGroupList(false); setEditingGroup(g); setIsGroupModalOpen(true); }}
-                        className="text-primary hover:underline"
-                      >
-                        编辑
-                      </button>
-                      <button
-                        onClick={() => handleDeleteGroup(g.id)}
-                        className="text-red-500 hover:underline"
-                      >
-                        删除
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <button
-              onClick={() => setShowGroupList(false)}
-              className="w-full mt-4 py-2.5 btn-secondary"
-            >
-              关闭
-            </button>
           </div>
-        </div>
-      )}
+        )
+      }
     </>
   );
 }

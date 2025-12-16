@@ -99,7 +99,7 @@ export function parseM3U8(content: string, baseUrl: string): { segments: M3U8Seg
     } else if (line && !line.startsWith('#')) {
       // This is a segment URL
       const url = line.startsWith('http') ? line : new URL(line, baseUrl).href;
-      
+
       segments.push({
         duration: currentDuration,
         url,
@@ -188,7 +188,7 @@ export function analyzeAdSections(
   // Find the longest section (likely main content)
   let mainContentIndex = 0;
   let maxDuration = 0;
-  
+
   for (let i = 0; i < sections.length; i++) {
     if (sections[i].totalDuration > maxDuration) {
       maxDuration = sections[i].totalDuration;
@@ -197,7 +197,7 @@ export function analyzeAdSections(
   }
 
   const mainSection = sections[mainContentIndex];
-  
+
   // Extract URL pattern from main content (domain + path prefix)
   const mainUrlPatterns = extractUrlPatterns(mainSection.segments);
 
@@ -223,7 +223,7 @@ export function analyzeAdSections(
     // 1. Short sections at start/end are likely ads
     // 2. Sections with different URL patterns are likely ads
     // 3. Very short sections (< 30s) are likely ads
-    
+
     const isAtBoundary = section.index === 0 || section.index === sections.length - 1;
     const isShort = section.totalDuration < 30;
     const isMedium = section.totalDuration < 90;
@@ -244,7 +244,7 @@ export function analyzeAdSections(
   const nonAdSegments = sections
     .filter(s => !s.isAd)
     .reduce((sum, s) => sum + s.segments.length, 0);
-  
+
   if (nonAdSegments < config.minMainContentSegments) {
     // Would filter too much, reset all to non-ad
     console.warn('Ad filter: would remove too many segments, disabling section filtering');
@@ -261,7 +261,7 @@ export function analyzeAdSections(
  */
 function extractUrlPatterns(segments: M3U8Segment[]): Set<string> {
   const patterns = new Set<string>();
-  
+
   for (const segment of segments) {
     try {
       const url = new URL(segment.url);
@@ -273,7 +273,7 @@ function extractUrlPatterns(segments: M3U8Segment[]): Set<string> {
       // Invalid URL, skip
     }
   }
-  
+
   return patterns;
 }
 
@@ -284,7 +284,7 @@ function urlPatternsMatch(patterns1: Set<string>, patterns2: Set<string>): boole
   if (patterns1.size === 0 || patterns2.size === 0) {
     return true; // Can't determine, assume match
   }
-  
+
   // Check if any pattern from set2 exists in set1
   const patterns2Array = Array.from(patterns2);
   for (let i = 0; i < patterns2Array.length; i++) {
@@ -292,17 +292,17 @@ function urlPatternsMatch(patterns1: Set<string>, patterns2: Set<string>): boole
       return true;
     }
   }
-  
+
   // Also check for partial domain matches
   const domains1 = Array.from(patterns1).map(p => p.split('/')[0]);
   const domains2 = Array.from(patterns2).map(p => p.split('/')[0]);
-  
+
   for (let i = 0; i < domains2.length; i++) {
     if (domains1.includes(domains2[i])) {
       return true;
     }
   }
-  
+
   return false;
 }
 
@@ -315,7 +315,7 @@ export function filterM3U8Ads(
   config: Partial<AdFilterConfig> = {}
 ): FilterResult {
   const fullConfig: AdFilterConfig = { ...DEFAULT_AD_FILTER_CONFIG, ...config };
-  
+
   if (!fullConfig.enabled) {
     return {
       originalContent: content,
@@ -333,7 +333,7 @@ export function filterM3U8Ads(
   // Step 1: Analyze discontinuity sections for ad detection
   if (fullConfig.filterDiscontinuitySections && sections.length > 1) {
     analyzeAdSections(sections, fullConfig);
-    
+
     // Mark segments in ad sections
     for (const section of sections) {
       if (section.isAd) {
@@ -383,10 +383,10 @@ export function filterM3U8Ads(
       // Look ahead to get the segment URL
       const nextLine = lines[i + 1]?.trim();
       if (nextLine && !nextLine.startsWith('#')) {
-        const segmentUrl = nextLine.startsWith('http') 
-          ? nextLine 
+        const segmentUrl = nextLine.startsWith('http')
+          ? nextLine
           : new URL(nextLine, baseUrl).href;
-        
+
         // Check if this segment is an ad
         const segment = segments.find(s => s.url === segmentUrl);
         if (segment?.isAd) {
@@ -411,25 +411,25 @@ export function filterM3U8Ads(
         if (nextLine.startsWith('#EXTINF:')) {
           const urlLine = lines[j + 1]?.trim();
           if (urlLine && !urlLine.startsWith('#')) {
-            nextSegmentUrl = urlLine.startsWith('http') 
-              ? urlLine 
+            nextSegmentUrl = urlLine.startsWith('http')
+              ? urlLine
               : new URL(urlLine, baseUrl).href;
             break;
           }
         } else if (nextLine && !nextLine.startsWith('#')) {
-          nextSegmentUrl = nextLine.startsWith('http') 
-            ? nextLine 
+          nextSegmentUrl = nextLine.startsWith('http')
+            ? nextLine
             : new URL(nextLine, baseUrl).href;
           break;
         }
       }
-      
+
       const nextSegment = segments.find(s => s.url === nextSegmentUrl);
       if (nextSegment?.isAd) {
         skipDiscontinuity = true;
         continue;
       }
-      
+
       // Also skip if previous non-ad segment was followed by ad section
       if (!skipDiscontinuity) {
         filteredLines.push(lines[i]);
@@ -459,7 +459,7 @@ export function filterM3U8Ads(
 function cleanConsecutiveDiscontinuities(lines: string[]): string[] {
   const result: string[] = [];
   let lastWasDiscontinuity = false;
-  
+
   for (const line of lines) {
     const trimmed = line.trim();
     if (trimmed === '#EXT-X-DISCONTINUITY') {
@@ -475,12 +475,12 @@ function cleanConsecutiveDiscontinuities(lines: string[]): string[] {
       }
     }
   }
-  
+
   // Remove trailing discontinuity tag if present
   while (result.length > 0 && result[result.length - 1].trim() === '#EXT-X-DISCONTINUITY') {
     result.pop();
   }
-  
+
   // Remove leading discontinuity tag if it's right after header
   const headerEndIndex = result.findIndex(l => l.trim().startsWith('#EXTINF:'));
   if (headerEndIndex > 0) {
@@ -491,26 +491,63 @@ function cleanConsecutiveDiscontinuities(lines: string[]): string[] {
       }
     }
   }
-  
+
   return result;
 }
 
 /**
  * Check if user has ad-free privilege
+ * Checks both user's membership level and group permissions for adFree flag
  */
 export async function hasAdFreePrivilege(userId?: string): Promise<boolean> {
   if (!userId) return false;
-  
-  // TODO: Check user subscription status from database
-  // For now, return false (no ad-free by default)
-  // In production, query user's subscription tier
-  
+
   try {
-    // Example: Check if user has premium subscription
-    // const user = await prisma.user.findUnique({ where: { id: userId } });
-    // return user?.subscriptionTier === 'premium';
+    // Import dynamically to avoid circular dependencies
+    const { UserRepository, UserGroupRepository } = await import('@/repositories');
+    const { calculateEffectivePermissions, parseGroupPermissions } = await import('@/services/permission.service');
+
+    const userRepository = new UserRepository();
+    const groupRepository = new UserGroupRepository();
+
+    const user = await userRepository.findById(userId);
+    if (!user) return false;
+
+    // Fetch group permissions if user belongs to a group
+    let groupPermissions = null;
+    if (user.groupId) {
+      const group = await groupRepository.findById(user.groupId);
+      if (group) {
+        groupPermissions = parseGroupPermissions(group.permissions);
+      }
+    }
+
+    // Calculate effective permissions
+    const effectivePerms = calculateEffectivePermissions(
+      { memberLevel: user.memberLevel, memberExpiry: user.memberExpiry },
+      groupPermissions
+    );
+
+    // Check if ad-free from effective permissions
+    if (effectivePerms.adFree) {
+      return true;
+    }
+
+    // SVIP members are always ad-free (even if not explicitly set)
+    if (effectivePerms.memberLevel === 'svip') {
+      // Also check expiry for user's own SVIP
+      if (groupPermissions?.memberLevel === 'svip') {
+        return true; // Group-granted SVIP, always valid
+      }
+      if (user.memberLevel === 'svip' && user.memberExpiry) {
+        return new Date(user.memberExpiry) > new Date();
+      }
+    }
+
     return false;
-  } catch {
+  } catch (error) {
+    console.error('Failed to check ad-free privilege:', error);
     return false;
   }
 }
+

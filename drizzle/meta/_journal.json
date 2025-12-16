@@ -57,6 +57,13 @@
       "when": 1765690436899,
       "tag": "0007_broad_living_lightning",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1765865659963,
+      "tag": "0008_tranquil_barracuda",
+      "breakpoints": true
     }
   ]
 }

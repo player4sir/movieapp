@@ -24,6 +24,10 @@ export interface PaywallConfigSectionProps {
 const CONFIG_LABELS: Record<string, string> = {
   paywall_normal_price: '普通内容价格',
   paywall_adult_price: '成人内容价格',
+  paywall_vip_discount: 'VIP成人内容折扣',
+  paywall_preview_percentage: '试看比例',
+  paywall_preview_min_seconds: '最小试看时长',
+  paywall_preview_max_seconds: '最大试看时长',
   paywall_enabled: '付费墙开关',
 };
 
@@ -33,6 +37,10 @@ const CONFIG_LABELS: Record<string, string> = {
 const CONFIG_UNITS: Record<string, string> = {
   paywall_normal_price: '金币/集',
   paywall_adult_price: '金币/集',
+  paywall_vip_discount: '%',
+  paywall_preview_percentage: '%',
+  paywall_preview_min_seconds: '秒',
+  paywall_preview_max_seconds: '秒',
   paywall_enabled: '',
 };
 
@@ -88,7 +96,12 @@ export function PaywallConfigSection({ onShowToast }: PaywallConfigSectionProps)
    */
   const handleEdit = (key: string, value: unknown) => {
     setEditingKey(key);
-    setEditValue(String(value));
+    // For percentage configs, convert decimal to percentage for editing
+    if (key === 'paywall_vip_discount' || key === 'paywall_preview_percentage') {
+      setEditValue(String(Math.round((value as number) * 100)));
+    } else {
+      setEditValue(String(value));
+    }
   };
 
   /**
@@ -110,6 +123,13 @@ export function PaywallConfigSection({ onShowToast }: PaywallConfigSectionProps)
 
       if (key === 'paywall_enabled') {
         parsedValue = editValue === 'true';
+      } else if (key === 'paywall_vip_discount' || key === 'paywall_preview_percentage') {
+        // Convert percentage (0-100) to decimal (0-1)
+        const percent = parseInt(editValue, 10);
+        if (isNaN(percent) || percent < 0 || percent > 100) {
+          throw new Error('请输入0-100的有效百分比');
+        }
+        parsedValue = percent / 100;
       } else {
         parsedValue = parseInt(editValue, 10);
         if (isNaN(parsedValue as number)) {
@@ -170,8 +190,23 @@ export function PaywallConfigSection({ onShowToast }: PaywallConfigSectionProps)
     if (key === 'paywall_enabled') {
       return value ? '已开启' : '已关闭';
     }
+    if (key === 'paywall_vip_discount' || key === 'paywall_preview_percentage') {
+      // value is 0-1 decimal, display as percentage
+      const percent = Math.round((value as number) * 100);
+      return `${percent}%`;
+    }
     const unit = CONFIG_UNITS[key];
     return `${value}${unit ? ` ${unit}` : ''}`;
+  };
+
+  /**
+   * Get edit value (for percentage configs, convert decimal to percentage)
+   */
+  const getEditValue = (key: string, value: unknown): string => {
+    if (key === 'paywall_vip_discount' || key === 'paywall_preview_percentage') {
+      return String(Math.round((value as number) * 100));
+    }
+    return String(value);
   };
 
   if (loading) {

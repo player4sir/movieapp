@@ -67,6 +67,22 @@ export class FavoriteRepository extends BaseRepository {
   }
 
   /**
+   * Count favorites for a user.
+   * Used for enforcing maxFavorites limits.
+   */
+  async countByUser(userId: string): Promise<number> {
+    try {
+      const result = await this.db.query.favorites.findMany({
+        where: eq(favorites.userId, userId),
+        columns: { id: true },
+      });
+      return result.length;
+    } catch (error) {
+      throw new RepositoryError('Failed to count user favorites', 'COUNT_ERROR', error);
+    }
+  }
+
+  /**
    * Create a new favorite.
    * Throws DuplicateError if the user already has this VOD favorited.
    */
@@ -98,7 +114,7 @@ export class FavoriteRepository extends BaseRepository {
   async upsert(input: UpsertFavoriteInput): Promise<Favorite> {
     try {
       const existing = await this.findByUserAndVod(input.userId, input.vodId);
-      
+
       if (existing) {
         // Update existing favorite
         const [updated] = await this.db.update(favorites)
@@ -111,7 +127,7 @@ export class FavoriteRepository extends BaseRepository {
           .returning();
         return updated;
       }
-      
+
       // Create new favorite
       const [created] = await this.db.insert(favorites)
         .values({

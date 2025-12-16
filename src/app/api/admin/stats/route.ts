@@ -1,6 +1,6 @@
 /**
  * Admin Stats API Route
- * Returns user statistics for the admin dashboard
+ * Returns comprehensive user statistics for the admin dashboard
  * Requirements: 7.4
  */
 
@@ -22,18 +22,32 @@ export async function GET(request: NextRequest) {
     const weekStart = new Date(todayStart);
     weekStart.setDate(weekStart.getDate() - 7);
 
-    const [totalUsers, activeUsers, newUsersToday, newUsersThisWeek] = await Promise.all([
-      userRepository.countAll(),
-      userRepository.countActiveUsersSince(weekStart),
-      userRepository.countCreatedSince(todayStart),
-      userRepository.countCreatedSince(weekStart),
-    ]);
-
-    return NextResponse.json({
+    const [
       totalUsers,
       activeUsers,
       newUsersToday,
       newUsersThisWeek,
+      memberLevelCounts,
+      dailyRegistrations,
+    ] = await Promise.all([
+      userRepository.countAll(),
+      userRepository.countActiveUsersSince(weekStart),
+      userRepository.countCreatedSince(todayStart),
+      userRepository.countCreatedSince(weekStart),
+      userRepository.countByMemberLevel(),
+      userRepository.getDailyRegistrations(7),
+    ]);
+
+    return NextResponse.json({
+      // Basic stats
+      totalUsers,
+      activeUsers,
+      newUsersToday,
+      newUsersThisWeek,
+      // Membership distribution
+      memberLevelCounts,
+      // Daily registration trend
+      dailyRegistrations,
     });
   } catch (error) {
     console.error('Admin stats error:', error);

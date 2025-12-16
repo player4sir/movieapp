@@ -569,12 +569,33 @@ export class VideoAPIProxy {
 
   /**
    * Parses play URLs from VOD detail into structured format
+   * Filters out non-playable sources (only keeps m3u8 sources)
    * 
    * @param vodDetail - VOD detail object
-   * @returns Array of play sources with episodes
+   * @returns Array of play sources with episodes (filtered to m3u8 only)
    */
   parsePlayUrls(vodDetail: VODDetail): PlaySource[] {
-    return parsePlayUrl(vodDetail.vod_play_url, vodDetail.vod_play_from);
+    const allSources = parsePlayUrl(vodDetail.vod_play_url, vodDetail.vod_play_from);
+
+    // Filter to only keep m3u8 playable sources
+    const filteredSources: PlaySource[] = [];
+
+    for (const source of allSources) {
+      // Filter episodes to only those with m3u8 URLs
+      const m3u8Episodes = source.episodes.filter(ep =>
+        ep.url && ep.url.toLowerCase().includes('.m3u8')
+      );
+
+      // Only include source if it has at least one m3u8 episode
+      if (m3u8Episodes.length > 0) {
+        filteredSources.push({
+          name: source.name,
+          episodes: m3u8Episodes,
+        });
+      }
+    }
+
+    return filteredSources;
   }
 
   /**

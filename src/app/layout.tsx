@@ -35,7 +35,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN">
+    <html lang="zh-CN" suppressHydrationWarning>
       <head>
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -44,7 +44,7 @@ export default function RootLayout({
           content="black-translucent"
         />
       </head>
-      <body className="antialiased safe-area-inset">
+      <body className="antialiased safe-area-inset" suppressHydrationWarning>
         <Providers>{children}</Providers>
       </body>
     </html>

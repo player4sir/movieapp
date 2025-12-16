@@ -84,12 +84,12 @@ export function GroupFormModal({ isOpen, group, onClose, onSave }: GroupFormModa
   if (!isOpen) return null;
 
   return (
-    <div 
-      className="fixed inset-0 bg-black/50 flex items-end lg:items-center justify-center z-50" 
+    <div
+      className="fixed inset-0 bg-black/50 flex items-end lg:items-center justify-center z-50"
       onClick={onClose}
     >
-      <div 
-        className="bg-background rounded-t-xl lg:rounded-lg p-5 w-full lg:max-w-md max-h-[90vh] overflow-y-auto" 
+      <div
+        className="bg-background rounded-t-xl lg:rounded-lg p-5 w-full lg:max-w-md max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-lg font-semibold mb-4">
@@ -98,21 +98,21 @@ export function GroupFormModal({ isOpen, group, onClose, onSave }: GroupFormModa
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm mb-1.5">名称 <span className="text-red-500">*</span></label>
-            <input 
-              type="text" 
-              value={form.name} 
-              onChange={(e) => setForm({ ...form, name: e.target.value })} 
-              className="input" 
+            <input
+              type="text"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              className="input"
               placeholder="输入用户组名称"
-              required 
+              required
             />
           </div>
           <div>
             <label className="block text-sm mb-1.5">描述</label>
-            <textarea 
-              value={form.description} 
-              onChange={(e) => setForm({ ...form, description: e.target.value })} 
-              className="input min-h-[60px]" 
+            <textarea
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              className="input min-h-[60px]"
               placeholder="输入用户组描述（可选）"
             />
           </div>
@@ -120,14 +120,13 @@ export function GroupFormModal({ isOpen, group, onClose, onSave }: GroupFormModa
             <label className="block text-sm mb-1.5">标识颜色</label>
             <div className="flex gap-2">
               {COLOR_PALETTE.map((c) => (
-                <button 
-                  key={c} 
-                  type="button" 
-                  onClick={() => setForm({ ...form, color: c })} 
-                  className={`w-7 h-7 rounded-full transition-all ${
-                    form.color === c ? 'ring-2 ring-offset-2 ring-primary scale-110' : 'hover:scale-105'
-                  }`} 
-                  style={{ backgroundColor: c }} 
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setForm({ ...form, color: c })}
+                  className={`w-7 h-7 rounded-full transition-all ${form.color === c ? 'ring-2 ring-offset-2 ring-primary scale-110' : 'hover:scale-105'
+                    }`}
+                  style={{ backgroundColor: c }}
                 />
               ))}
             </div>
@@ -138,60 +137,40 @@ export function GroupFormModal({ isOpen, group, onClose, onSave }: GroupFormModa
             <div className="space-y-3">
               <div>
                 <label className="block text-sm mb-1">覆盖会员等级</label>
-                <select 
-                  value={form.permissions.memberLevel || ''} 
-                  onChange={(e) => updatePerm('memberLevel', e.target.value || undefined)} 
+                <select
+                  value={form.permissions.memberLevel || ''}
+                  onChange={(e) => updatePerm('memberLevel', e.target.value || undefined)}
                   className="input"
                 >
-                  <option value="">不覆盖</option>
-                  <option value="free">免费</option>
-                  <option value="vip">VIP</option>
-                  <option value="svip">SVIP</option>
+                  <option value="">不覆盖（使用用户自身等级）</option>
+                  <option value="vip">VIP（可免费观看普通内容）</option>
+                  <option value="svip">SVIP（可免费观看所有内容）</option>
                 </select>
+                <p className="text-xs text-foreground/50 mt-1">设置后，组内用户自动获得该会员权益，无需购买、永不过期</p>
               </div>
               <label className="flex items-center gap-2">
-                <input 
-                  type="checkbox" 
-                  checked={form.permissions.adFree || false} 
-                  onChange={(e) => updatePerm('adFree', e.target.checked || undefined)} 
-                  className="w-4 h-4 rounded" 
+                <input
+                  type="checkbox"
+                  checked={form.permissions.adFree || false}
+                  onChange={(e) => updatePerm('adFree', e.target.checked || undefined)}
+                  className="w-4 h-4 rounded"
                 />
                 <span className="text-sm">免广告</span>
               </label>
-              <label className="flex items-center gap-2">
-                <input 
-                  type="checkbox" 
-                  checked={form.permissions.canDownload || false} 
-                  onChange={(e) => updatePerm('canDownload', e.target.checked || undefined)} 
-                  className="w-4 h-4 rounded" 
-                />
-                <span className="text-sm">允许下载</span>
-              </label>
-              <div>
-                <label className="block text-sm mb-1">最大收藏数</label>
-                <input 
-                  type="number" 
-                  value={form.permissions.maxFavorites || ''} 
-                  onChange={(e) => updatePerm('maxFavorites', e.target.value ? parseInt(e.target.value) : undefined)} 
-                  className="input" 
-                  placeholder="不限制" 
-                  min={0} 
-                />
-              </div>
             </div>
           </div>
 
           <div className="flex gap-3 pt-2">
-            <button 
-              type="button" 
-              onClick={onClose} 
+            <button
+              type="button"
+              onClick={onClose}
               className="btn-secondary flex-1 py-2.5"
             >
               取消
             </button>
-            <button 
-              type="submit" 
-              disabled={saving || !form.name.trim()} 
+            <button
+              type="submit"
+              disabled={saving || !form.name.trim()}
               className="btn-primary flex-1 py-2.5 disabled:opacity-50"
             >
               {saving ? '保存中...' : '保存'}

@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import Link from 'next/link';
+import useSWR from 'swr';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
 import {
   CoinConfigSection,
@@ -10,8 +11,6 @@ import {
   useToast
 } from '@/components/admin';
 
-// Define the CoinOrder interface locally or import it if shared
-// Ideally should be imported, but for now matching the component's expectation
 interface CoinOrder {
   id: string;
   orderNo: string;
@@ -30,20 +29,31 @@ interface CoinOrder {
   updatedAt: string;
 }
 
-/**
- * Coin Management Page
- * Includes:
- * 1. Coin Configuration (Exchange rates, Packages)
- * 2. Coin Order Management (Review user recharges)
- * 
- * Requirements: 5.1, 5.2, 5.3, 5.4, 7.5
- */
+interface OrderStats {
+  pendingOrders: { coin: number };
+  paidOrders: { coin: number };
+}
+
 export default function CoinConfigPage() {
   const { getAccessToken } = useAdminAuth();
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'orders' | 'config'>('orders');
   const [reviewOrder, setReviewOrder] = useState<CoinOrder | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // 获取待处理订单数量
+  const { data: orderStats } = useSWR<OrderStats>(
+    '/api/admin/orders/stats',
+    async (url) => {
+      const token = getAccessToken();
+      if (!token) return null;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      return res.json();
+    },
+    { refreshInterval: 30000 }
+  );
+
+  const pendingCount = (orderStats?.pendingOrders?.coin ?? 0) + (orderStats?.paidOrders?.coin ?? 0);
 
   const handleReviewOrder = useCallback((order: CoinOrder) => {
     setReviewOrder(order);
@@ -58,39 +68,41 @@ export default function CoinConfigPage() {
   }, [showToast]);
 
   return (
-    <div className="p-4 lg:p-6 max-w-7xl mx-auto">
-      {/* Header with back button */}
-      <div className="flex items-center gap-3 mb-6">
+    <div className="p-4 lg:p-6 max-w-6xl mx-auto">
+      {/* 简洁头部 */}
+      <div className="flex items-center gap-3 mb-4">
         <Link
           href="/console-x9k2m/settings"
-          className="p-2 -ml-2 text-foreground/60 hover:text-foreground rounded-lg hover:bg-surface-secondary/50"
+          className="p-1.5 text-foreground/50 hover:text-foreground rounded-lg hover:bg-surface"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </Link>
-        <div>
-          <h1 className="text-xl font-semibold">金币管理</h1>
-          <p className="text-sm text-foreground/50 mt-1">管理金币充值订单及系统配置</p>
-        </div>
+        <h1 className="text-lg font-semibold">金币管理</h1>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 p-1.5 bg-surface-secondary/30 rounded-xl mb-6 overflow-x-auto border border-border/10 w-fit">
+      {/* 紧凑Tab */}
+      <div className="flex gap-1 mb-4 border-b border-border/50">
         <button
           onClick={() => setActiveTab('orders')}
-          className={`px-4 py-2.5 text-sm rounded-lg transition-all duration-200 whitespace-nowrap font-medium ${activeTab === 'orders'
-            ? 'bg-surface text-foreground shadow-sm ring-1 ring-black/5 dark:ring-white/10'
-            : 'text-foreground/50 hover:text-foreground/70 hover:bg-surface-secondary/50'
+          className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'orders'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-foreground/50 hover:text-foreground'
             }`}
         >
           充值订单
+          {pendingCount > 0 && (
+            <span className="px-1.5 py-0.5 text-xs bg-amber-500/10 text-amber-500 rounded">
+              {pendingCount}
+            </span>
+          )}
         </button>
         <button
           onClick={() => setActiveTab('config')}
-          className={`px-4 py-2.5 text-sm rounded-lg transition-all duration-200 whitespace-nowrap font-medium ${activeTab === 'config'
-            ? 'bg-surface text-foreground shadow-sm ring-1 ring-black/5 dark:ring-white/10'
-            : 'text-foreground/50 hover:text-foreground/70 hover:bg-surface-secondary/50'
+          className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'config'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-foreground/50 hover:text-foreground'
             }`}
         >
           系统配置

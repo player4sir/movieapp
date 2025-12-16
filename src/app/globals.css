@@ -77,11 +77,31 @@
     @apply text-foreground;
     @apply focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary;
     min-height: 44px;
+    color-scheme: dark;
   }
 
   .input::placeholder {
     color: var(--foreground);
     opacity: 0.5;
+  }
+
+  /* Force dark background for select and input elements */
+  select,
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  textarea {
+    background-color: var(--surface-secondary);
+    color: var(--foreground);
+    color-scheme: dark;
+  }
+
+  /* Select option styling for dark mode */
+  select option {
+    background-color: var(--surface);
+    color: var(--foreground);
   }
 }
 

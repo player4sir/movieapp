@@ -6,19 +6,21 @@
  * - VIP: Can access normal content for free
  * - SVIP: Can access all content (normal + adult) for free
  * 
- * Migrated from Prisma to Drizzle ORM using Repository pattern.
+ * Now considers user group permissions for membership level override.
  * Requirements: 3.1, 3.4
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, isAuthError } from '@/lib/auth-middleware';
-import { UserRepository } from '@/repositories';
+import { UserRepository, UserGroupRepository } from '@/repositories';
+import { calculateEffectivePermissions, parseGroupPermissions } from '@/services/permission.service';
 
-// Repository instance
+// Repository instances
 const userRepository = new UserRepository();
+const groupRepository = new UserGroupRepository();
 
 /**
- * Check if membership is still active
+ * Check if membership is still active (for user's own membership, not group-granted)
  */
 function isMembershipActive(memberExpiry: Date | null): boolean {
   if (!memberExpiry) return false;
@@ -55,15 +57,32 @@ export async function GET(request: NextRequest) {
       }, { status: 200 });
     }
 
-    // Check membership status
-    const isActive = isMembershipActive(userData.memberExpiry);
-    const memberLevel = userData.memberLevel || 'free';
+    // Fetch group permissions if user belongs to a group
+    let groupPermissions = null;
+    if (userData.groupId) {
+      const group = await groupRepository.findById(userData.groupId);
+      if (group) {
+        groupPermissions = parseGroupPermissions(group.permissions);
+      }
+    }
 
-    // Determine tier based on memberLevel and active status
-    // VIP: can access normal content for free
-    // SVIP: can access all content (normal + adult) for free
-    const isSvip = isActive && memberLevel === 'svip';
-    const isVip = isActive && (memberLevel === 'vip' || memberLevel === 'svip');
+    // Calculate effective permissions considering group overrides
+    const effectivePerms = calculateEffectivePermissions(
+      { memberLevel: userData.memberLevel, memberExpiry: userData.memberExpiry },
+      groupPermissions
+    );
+
+    // Determine if membership is active:
+    // - Group-granted memberships are always active (no expiry)
+    // - User's own membership requires valid expiry
+    const hasGroupMembershipOverride = !!groupPermissions?.memberLevel;
+    const isUserMembershipActive = isMembershipActive(userData.memberExpiry);
+    const isEffectiveMembershipActive = hasGroupMembershipOverride || isUserMembershipActive;
+
+    // Determine tier based on effective memberLevel and active status
+    const effectiveMemberLevel = effectivePerms.memberLevel;
+    const isSvip = isEffectiveMembershipActive && effectiveMemberLevel === 'svip';
+    const isVip = isEffectiveMembershipActive && (effectiveMemberLevel === 'vip' || effectiveMemberLevel === 'svip');
 
     // Admin users also get premium features
     const isAdmin = userData.role === 'admin';
@@ -79,13 +98,19 @@ export async function GET(request: NextRequest) {
       tier = 'admin';
     }
 
-    // Features based on tier
+    // Features based on tier and effective permissions
     const features: string[] = [];
+    if (isPremium || effectivePerms.adFree) {
+      features.push('ad_free');
+    }
     if (isPremium) {
-      features.push('ad_free', 'hd_quality', 'no_wait');
+      features.push('hd_quality', 'no_wait');
     }
     if (isSvip || isAdmin) {
       features.push('adult_access');
+    }
+    if (effectivePerms.canDownload) {
+      features.push('download');
     }
 
     return NextResponse.json({
@@ -94,8 +119,17 @@ export async function GET(request: NextRequest) {
       isSvip,
       tier,
       features,
-      memberLevel,
-      expiresAt: userData.memberExpiry,
+      memberLevel: effectiveMemberLevel,
+      // Return user's own expiry (null for group-granted membership)
+      expiresAt: hasGroupMembershipOverride ? null : userData.memberExpiry,
+      // Additional info about permissions source
+      permissionSource: effectivePerms.source,
+      effectivePermissions: {
+        adFree: effectivePerms.adFree,
+        canDownload: effectivePerms.canDownload,
+        maxFavorites: effectivePerms.maxFavorites,
+        qualityLimit: effectivePerms.qualityLimit,
+      },
     }, { status: 200 });
   } catch (error: unknown) {
     console.error('Get subscription error:', error);
@@ -105,3 +139,4 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+

@@ -7,6 +7,7 @@ export { useAgeVerification } from './useAgeVerification';
 export { useCoins } from './useCoins';
 export { useContentAccess } from './useContentAccess';
 export { useUnlockedContent } from './useUnlockedContent';
+export { useSiteSettings, invalidateSiteSettingsCache } from './useSiteSettings';
 export type {
   CoinBalance,
   CheckinStatus,

@@ -97,6 +97,12 @@ function PlayPageContent() {
   const [contentPrice, setContentPrice] = useState<number>(0);
   const [showUnlockModal, setShowUnlockModal] = useState(false);
 
+  // Preview/Trial viewing state
+  const [previewConfig, setPreviewConfig] = useState<{ percentage: number; minSeconds: number; maxSeconds: number } | null>(null);
+  const [previewDuration, setPreviewDuration] = useState<number>(0); // Calculated preview duration in seconds
+  const [previewEnded, setPreviewEnded] = useState(false); // Whether preview time has ended
+  const [previewTimeLeft, setPreviewTimeLeft] = useState<number>(0); // Remaining preview time for display
+
   // Refs for tracking
   const lastSaveTimeRef = useRef(0);
   const saveIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -121,8 +127,26 @@ function PlayPageContent() {
     setSelectedSourceIndex(m3u8SourceIndex >= 0 ? m3u8SourceIndex : 0);
   }, [vod, selectedSourceIndex]);
 
+  // Fetch preview configuration
+  useEffect(() => {
+    const fetchPreviewConfig = async () => {
+      try {
+        const response = await fetch('/api/paywall/preview-config');
+        if (response.ok) {
+          const data = await response.json();
+          setPreviewConfig(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch preview config:', err);
+        // Use defaults
+        setPreviewConfig({ percentage: 0.25, minSeconds: 60, maxSeconds: 600 });
+      }
+    };
+    fetchPreviewConfig();
+  }, []);
+
   // Check content access on load and episode change
-  // Requirements: 1.1, 1.2 - Show unlock modal immediately for locked content
+  // For locked content, allow preview instead of immediately showing modal
   useEffect(() => {
     // Don't check access if not authenticated or still loading auth
     if (!isAuthenticated || authLoading) return;
@@ -131,16 +155,23 @@ function PlayPageContent() {
     const checkContentAccess = async () => {
       const result = await checkAccess(vod.vod_id, selectedEpisodeIndex, sourceCategory);
 
+      // Debug: Log access check result
+      console.log('[Preview] checkAccess result:', result);
+
       if (result) {
         setHasAccess(result.hasAccess);
         setAccessType(result.accessType);
         setContentPrice(result.price ?? 0);
 
-        // Show unlock modal immediately for locked content (Requirements: 1.1, 3.1)
+        // For locked content, allow preview (don't show modal immediately)
+        // Modal will be shown when preview ends
         if (!result.hasAccess && result.accessType === 'locked') {
-          setShowUnlockModal(true);
+          // Reset preview state for new episode
+          setPreviewEnded(false);
+          setShowUnlockModal(false);
         } else {
           setShowUnlockModal(false);
+          setPreviewEnded(false);
         }
       }
     };
@@ -273,11 +304,60 @@ function PlayPageContent() {
     }
   }, [vod, selectedSourceIndex, selectedEpisodeIndex, sourceCategory]);
 
-  // Handle time update from video player - simplified without preview tracking
-  // Requirements: 1.2 - Allow unrestricted playback for users with full access
+  // Handle time update from video player
+  // Track preview time for locked content
   const handleTimeUpdate = useCallback((currentTime: number, duration: number) => {
+    // Save progress
     saveProgress(currentTime, duration);
-  }, [saveProgress]);
+
+    // Debug: Log access state (only once every 5 seconds to avoid spam)
+    if (Math.floor(currentTime) % 5 === 0) {
+      console.log('[Preview] Access state:', { hasAccess, accessType, previewConfig: !!previewConfig, previewDuration });
+    }
+
+    // Only process preview logic for locked content
+    if (!hasAccess && accessType === 'locked' && previewConfig) {
+      // Calculate preview duration once when we first get a VALID video duration
+      // Duration must be: finite, positive, and at least 10 seconds (to ensure metadata is loaded)
+      const isDurationValid = isFinite(duration) && duration >= 10;
+
+      if (isDurationValid && previewDuration === 0) {
+        const percentageDuration = Math.floor(duration * previewConfig.percentage);
+        const calculatedDuration = Math.min(
+          Math.max(percentageDuration, previewConfig.minSeconds),
+          previewConfig.maxSeconds
+        );
+        // Don't exceed total duration
+        const finalDuration = Math.min(calculatedDuration, duration);
+        console.log('[Preview] Video duration confirmed:', duration, 'seconds');
+        console.log('[Preview] Calculated preview duration:', finalDuration, 'seconds');
+        setPreviewDuration(finalDuration);
+        setPreviewTimeLeft(finalDuration);
+        return; // Don't check end on the same frame we calculate
+      }
+
+      // Update remaining preview time for display
+      if (previewDuration > 0 && !previewEnded) {
+        const remaining = Math.max(0, previewDuration - currentTime);
+        setPreviewTimeLeft(remaining);
+
+        // Debug log
+        console.log('[Preview] Current:', currentTime.toFixed(1), '/ Preview limit:', previewDuration, '/ Remaining:', remaining.toFixed(1));
+
+        // Only check end after video actually started playing (at least 3 seconds in)
+        // This gives time for the player to settle after seeking
+        if (currentTime >= 3 && currentTime >= previewDuration) {
+          console.log('[Preview] Preview ended at', currentTime, 'seconds (limit was', previewDuration, ')');
+          setPreviewEnded(true);
+          setShowUnlockModal(true);
+          // Pause the video
+          if (videoRef.current) {
+            videoRef.current.pause();
+          }
+        }
+      }
+    }
+  }, [saveProgress, previewConfig, hasAccess, accessType, previewDuration, previewEnded]);
 
   // Handle unlock action
   const handleUnlock = useCallback(async () => {
@@ -291,11 +371,21 @@ function PlayPageContent() {
       setAccessType('purchased');
       setShowUnlockModal(false);
 
+      // Reset preview state
+      setPreviewEnded(false);
+      setPreviewDuration(0);
+      setPreviewTimeLeft(0);
+
       // Invalidate cache for this content
       invalidateCache(vod.vod_id, selectedEpisodeIndex);
 
       // Refresh VOD data to get new tokens with full access (non-preview)
       await refresh();
+
+      // Resume playback
+      if (videoRef.current) {
+        videoRef.current.play();
+      }
     }
   }, [vod, selectedEpisodeIndex, sourceCategory, unlockContent, invalidateCache, refresh]);
 
@@ -463,10 +553,10 @@ function PlayPageContent() {
 
   return (
     <div className="min-h-screen bg-black">
-      {/* Video Player or Poster for locked content */}
+      {/* Video Player or Lock overlay after preview ends */}
       <div className="relative">
-        {isLocked ? (
-          /* Show poster image when content is locked (Requirements: 3.2) */
+        {isLocked && previewEnded ? (
+          /* Show lock overlay only after preview has ended */
           <div className="aspect-video bg-black flex items-center justify-center">
             {vod.vod_pic ? (
               <img
@@ -483,22 +573,30 @@ function PlayPageContent() {
                 <svg className="w-16 h-16 mx-auto mb-2 opacity-80" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" />
                 </svg>
-                <p className="text-sm opacity-80">需要解锁才能观看</p>
+                <p className="text-sm opacity-80">试看已结束，请解锁继续观看</p>
               </div>
             </div>
           </div>
         ) : (
-          <VideoPlayer
-            ref={videoRef}
-            src={videoUrl}
-            poster={vod.vod_pic}
-            initialPosition={initialPosition}
-            onTimeUpdate={handleTimeUpdate}
-            onEnded={handleVideoEnded}
-            onError={(err) => console.error('[PlayPage] Video error:', err)}
-            onSourceSwitch={() => setShowEpisodeList(true)}
-            useIframe={useIframe}
-          />
+          <>
+            <VideoPlayer
+              ref={videoRef}
+              src={videoUrl}
+              poster={vod.vod_pic}
+              initialPosition={initialPosition}
+              onTimeUpdate={handleTimeUpdate}
+              onEnded={handleVideoEnded}
+              onError={(err) => console.error('[PlayPage] Video error:', err)}
+              onSourceSwitch={() => setShowEpisodeList(true)}
+              useIframe={useIframe}
+            />
+            {/* Preview time indicator for locked content */}
+            {isLocked && previewDuration > 0 && !previewEnded && (
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 px-3 py-1.5 bg-amber-500/90 rounded-full text-white text-xs font-medium">
+                试看中 · 剩余 {formatTime(previewTimeLeft)}
+              </div>
+            )}
+          </>
         )}
 
         {/* Back Button Overlay */}

@@ -21,6 +21,10 @@ import {
 const PAYWALL_CONFIG_KEYS = [
   'paywall_normal_price',
   'paywall_adult_price',
+  'paywall_vip_discount',
+  'paywall_preview_percentage',
+  'paywall_preview_min_seconds',
+  'paywall_preview_max_seconds',
   'paywall_enabled',
 ] as const;
 
@@ -33,6 +37,22 @@ const PAYWALL_DEFAULTS: Record<string, { value: unknown; description: string }> 
   paywall_adult_price: {
     value: 10,
     description: '成人内容每集解锁价格（金币）',
+  },
+  paywall_vip_discount: {
+    value: 0.5,
+    description: 'VIP用户观看成人内容的折扣率（0-1，0.5表示50%折扣）',
+  },
+  paywall_preview_percentage: {
+    value: 0.25,
+    description: '试看比例（0-1，0.25表示25%）',
+  },
+  paywall_preview_min_seconds: {
+    value: 60,
+    description: '最小试看时长（秒）',
+  },
+  paywall_preview_max_seconds: {
+    value: 600,
+    description: '最大试看时长（秒）',
   },
   paywall_enabled: {
     value: true,
@@ -66,6 +86,30 @@ function validatePaywallConfig(key: string, value: unknown): { valid: boolean; e
     case 'paywall_enabled':
       if (typeof value !== 'boolean') {
         return { valid: false, error: '付费墙开关必须是布尔值' };
+      }
+      break;
+
+    case 'paywall_vip_discount':
+      if (typeof value !== 'number' || value < 0 || value > 1) {
+        return { valid: false, error: 'VIP折扣率必须是0-1之间的数字' };
+      }
+      break;
+
+    case 'paywall_preview_percentage':
+      if (typeof value !== 'number' || value < 0 || value > 1) {
+        return { valid: false, error: '试看比例必须是0-1之间的数字' };
+      }
+      break;
+
+    case 'paywall_preview_min_seconds':
+      if (typeof value !== 'number' || value < 0 || !Number.isInteger(value)) {
+        return { valid: false, error: '最小试看时长必须是非负整数' };
+      }
+      break;
+
+    case 'paywall_preview_max_seconds':
+      if (typeof value !== 'number' || value < 0 || !Number.isInteger(value)) {
+        return { valid: false, error: '最大试看时长必须是非负整数' };
       }
       break;
 

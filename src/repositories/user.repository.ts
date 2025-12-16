@@ -432,4 +432,60 @@ export class UserRepository extends BaseRepository {
       throw new RepositoryError('Failed to count active users since date', 'COUNT_ERROR', error);
     }
   }
+
+  /**
+   * Count users grouped by member level.
+   * Returns counts for free, vip, and svip users.
+   */
+  async countByMemberLevel(): Promise<{ free: number; vip: number; svip: number }> {
+    try {
+      const result = await this.db
+        .select({
+          memberLevel: users.memberLevel,
+          count: sql<number>`count(*)`,
+        })
+        .from(users)
+        .groupBy(users.memberLevel);
+
+      const counts = { free: 0, vip: 0, svip: 0 };
+      for (const row of result) {
+        if (row.memberLevel === 'free') counts.free = Number(row.count);
+        else if (row.memberLevel === 'vip') counts.vip = Number(row.count);
+        else if (row.memberLevel === 'svip') counts.svip = Number(row.count);
+      }
+      return counts;
+    } catch (error) {
+      throw new RepositoryError('Failed to count users by member level', 'COUNT_ERROR', error);
+    }
+  }
+
+  /**
+   * Get daily registration counts for the past N days.
+   * Returns array of { date, count } sorted by date ascending.
+   */
+  async getDailyRegistrations(days: number = 7): Promise<{ date: string; count: number }[]> {
+    try {
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+      startDate.setHours(0, 0, 0, 0);
+
+      const result = await this.db
+        .select({
+          date: sql<string>`DATE(${users.createdAt})`,
+          count: sql<number>`count(*)`,
+        })
+        .from(users)
+        .where(gte(users.createdAt, startDate))
+        .groupBy(sql`DATE(${users.createdAt})`)
+        .orderBy(sql`DATE(${users.createdAt})`);
+
+      return result.map(row => ({
+        date: String(row.date),
+        count: Number(row.count),
+      }));
+    } catch (error) {
+      throw new RepositoryError('Failed to get daily registrations', 'COUNT_ERROR', error);
+    }
+  }
 }
+
