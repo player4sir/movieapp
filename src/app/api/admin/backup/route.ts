@@ -5,7 +5,7 @@ import { backupService } from '@/services/backup.service';
 // Force dynamic to avoid static generation issues
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
     try {
         // 1. Auth check (Basic implementation, enhance with actual admin check)
         // In a real app, middleware should handle this or we check session here

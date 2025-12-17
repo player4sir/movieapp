@@ -189,6 +189,49 @@ export class MembershipOrderRepository extends BaseRepository {
   }
 
   /**
+   * Atomic conditional update - only updates if conditions are met.
+   * This prevents race conditions in approval flow.
+   * Returns null if conditions not met (e.g., status already changed).
+   */
+  async updateWithCondition(
+    id: string,
+    conditions: { status?: string[] },
+    input: UpdateMembershipOrderInput
+  ): Promise<MembershipOrder | null> {
+    try {
+      const updateData: Record<string, unknown> = {
+        updatedAt: new Date(),
+      };
+
+      if (input.status !== undefined) updateData.status = input.status;
+      if (input.paymentType !== undefined) updateData.paymentType = input.paymentType;
+      if (input.paymentScreenshot !== undefined) updateData.paymentScreenshot = input.paymentScreenshot;
+      if (input.transactionNote !== undefined) updateData.transactionNote = input.transactionNote;
+      if (input.reviewedBy !== undefined) updateData.reviewedBy = input.reviewedBy;
+      if (input.reviewedAt !== undefined) updateData.reviewedAt = input.reviewedAt;
+      if (input.rejectReason !== undefined) updateData.rejectReason = input.rejectReason;
+
+      const whereConditions = [eq(membershipOrders.id, id)];
+
+      // Add status condition if provided
+      if (conditions.status && conditions.status.length > 0) {
+        whereConditions.push(
+          sql`${membershipOrders.status} IN (${sql.join(conditions.status.map(s => sql`${s}`), sql`, `)})`
+        );
+      }
+
+      const [order] = await this.db.update(membershipOrders)
+        .set(updateData)
+        .where(and(...whereConditions))
+        .returning();
+
+      return order ?? null;
+    } catch (error) {
+      throw new RepositoryError('Failed to update membership order with condition', 'UPDATE_ERROR', error);
+    }
+  }
+
+  /**
    * List orders with pagination and filters.
    */
   async list(params: OrderListParams = {}): Promise<OrderListResult> {

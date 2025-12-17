@@ -2,10 +2,14 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useState, memo } from 'react';
+import { useState, memo, useCallback, useRef } from 'react';
 import type { VODItem } from '@/types/vod';
+import { prefetchVODDetail } from '@/hooks/useVOD';
 
 type SourceCategory = 'normal' | 'adult';
+
+// Base64 SVG placeholder for blur effect (gray background)
+const BLUR_PLACEHOLDER = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMjAyMDIwIi8+PC9zdmc+';
 
 interface VODCardProps {
   vod: VODItem;
@@ -16,21 +20,32 @@ interface VODCardProps {
 export const VODCard = memo(function VODCard({ vod, priority = false, sourceCategory }: VODCardProps) {
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const prefetchedRef = useRef(false);
 
   const posterUrl = vod.vod_pic || '';
   const hasValidPoster = posterUrl && !imageError;
-  
+
   // Build detail URL with optional sourceCategory parameter
-  const detailUrl = sourceCategory 
+  const detailUrl = sourceCategory
     ? `/detail/${vod.vod_id}?sourceCategory=${sourceCategory}`
     : `/detail/${vod.vod_id}`;
+
+  // Prefetch on hover/touch - only once per card
+  const handlePrefetch = useCallback(() => {
+    if (!prefetchedRef.current) {
+      prefetchedRef.current = true;
+      prefetchVODDetail(vod.vod_id, sourceCategory);
+    }
+  }, [vod.vod_id, sourceCategory]);
 
   return (
     <Link
       href={detailUrl}
       className="block group touch-manipulation will-change-transform"
+      onMouseEnter={handlePrefetch}
+      onTouchStart={handlePrefetch}
     >
-      <article 
+      <article
         className="relative overflow-hidden rounded-xl bg-surface shadow-sm 
           transition-shadow duration-200 ease-out
           hover:shadow-xl hover:shadow-black/10
@@ -53,6 +68,8 @@ export const VODCard = memo(function VODCard({ vod, priority = false, sourceCate
                   ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
                 loading={priority ? 'eager' : 'lazy'}
                 priority={priority}
+                placeholder="blur"
+                blurDataURL={BLUR_PLACEHOLDER}
                 onLoad={() => setImageLoaded(true)}
                 onError={() => setImageError(true)}
               />
@@ -104,9 +121,9 @@ export const VODCardCompact = memo(function VODCardCompact({ vod, sourceCategory
   const [imageLoaded, setImageLoaded] = useState(false);
   const posterUrl = vod.vod_pic || '';
   const hasValidPoster = posterUrl && !imageError;
-  
+
   // Build detail URL with optional sourceCategory parameter
-  const detailUrl = sourceCategory 
+  const detailUrl = sourceCategory
     ? `/detail/${vod.vod_id}?sourceCategory=${sourceCategory}`
     : `/detail/${vod.vod_id}`;
 
@@ -131,6 +148,8 @@ export const VODCardCompact = memo(function VODCardCompact({ vod, sourceCategory
                 className={`object-cover transition-opacity duration-300
                   ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
                 loading="lazy"
+                placeholder="blur"
+                blurDataURL={BLUR_PLACEHOLDER}
                 onLoad={() => setImageLoaded(true)}
                 onError={() => setImageError(true)}
               />

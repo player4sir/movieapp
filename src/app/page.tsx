@@ -4,9 +4,12 @@ import { useState, useCallback } from 'react';
 import { AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 import { SliverHeader, BottomNav, PullToRefresh, VODGrid, CategoryMenu, Sidebar } from '@/components';
 import { AdSlotGroup } from '@/components/ads';
-import { useVODList, useCategories, useInfiniteScroll } from '@/hooks';
+import { useVODList, useCategories, useInfiniteScroll, useSiteSettings } from '@/hooks';
 
 export default function HomePage() {
+  // Get site settings for title
+  const { settings } = useSiteSettings();
+
   // Use 'normal' source category for home page (常规影视)
   const { categories, loading: categoriesLoading } = useCategories({ sourceCategory: 'normal' });
 
@@ -39,7 +42,7 @@ export default function HomePage() {
 
       <div className="h-screen flex flex-col bg-background overflow-hidden lg:pl-64">
         {/* Sliver Header with CategoryMenu */}
-        <SliverHeader title="精品影视">
+        <SliverHeader title={settings.site_name}>
           <CategoryMenu
             categories={categories}
             loading={categoriesLoading}

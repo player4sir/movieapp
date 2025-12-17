@@ -1,6 +1,6 @@
 import { db } from '@/db';
 import { allTables } from '@/db/schema';
-import { sql } from 'drizzle-orm';
+import type { PgTable } from 'drizzle-orm/pg-core';
 
 // Define the order for deletion (Reverse Dependency Order)
 // We must delete children before parents to avoid FK constraint violations
@@ -69,7 +69,7 @@ const INSERTION_ORDER = [
 interface BackupData {
     version: string;
     timestamp: string;
-    data: Record<string, any[]>;
+    data: Record<string, unknown[]>;
 }
 
 export class BackupService {
@@ -77,14 +77,15 @@ export class BackupService {
      * Export all data from the database
      */
     async exportData(): Promise<BackupData> {
-        const data: Record<string, any[]> = {};
+        const data: Record<string, unknown[]> = {};
 
         // Fetch all data from all tables
         for (const [key, table] of Object.entries(allTables)) {
             if (key === 'userRoleEnum') continue; // Skip enums
 
             try {
-                const result = await db.select().from(table as any);
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const result = await db.select().from(table as unknown as PgTable<any>);
                 data[key] = result;
             } catch (error) {
                 console.warn(`Failed to export table ${key}:`, error);
@@ -115,8 +116,8 @@ export class BackupService {
                 for (const tableName of DELETION_ORDER) {
                     const table = allTables[tableName as keyof typeof allTables];
                     if (table && tableName !== 'userRoleEnum') {
-                        // Use delete without where clause to delete all rows
-                        await tx.delete(table as any);
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        await tx.delete(table as unknown as PgTable<any>);
                     }
                 }
 
@@ -135,18 +136,20 @@ export class BackupService {
                         // but for migration matching schema, direct insert should work.
                         // We also need to sanitize dates if they are strings in JSON.
                         const sanitizedRows = rows.map(row => {
-                            const newRow = { ...row };
+                            // Cast to Record for spread operation
+                            const newRow = { ...(row as Record<string, unknown>) };
                             // Simple heuristic to convert ISO date strings back to Date objects
                             for (const key in newRow) {
                                 if (typeof newRow[key] === 'string' &&
-                                    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z$/.test(newRow[key])) {
-                                    newRow[key] = new Date(newRow[key]);
+                                    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z$/.test(newRow[key] as string)) {
+                                    newRow[key] = new Date(newRow[key] as string);
                                 }
                             }
                             return newRow;
                         });
 
-                        await tx.insert(table as any).values(sanitizedRows);
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        await tx.insert(table as unknown as PgTable<any>).values(sanitizedRows);
                         insertedCount += rows.length;
                     }
                 }

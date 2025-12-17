@@ -5,10 +5,11 @@ import { useRouter } from 'next/navigation';
 import { AlertCircle, Loader2, RefreshCw, Film } from 'lucide-react';
 import { SliverHeader, BottomNav, PullToRefresh, VODGrid, CategoryMenu, AgeVerificationGate, Sidebar } from '@/components';
 import { AdSlotGroup } from '@/components/ads';
-import { useVODList, useCategories, useInfiniteScroll, useAgeVerification } from '@/hooks';
+import { useVODList, useCategories, useInfiniteScroll, useAgeVerification, useSiteSettings } from '@/hooks';
 
 export default function AdultPage() {
   const router = useRouter();
+  const { settings } = useSiteSettings();
   const { isVerified, loading: verificationLoading, verify } = useAgeVerification();
 
   // Use 'adult' source category for adult content page
@@ -99,7 +100,7 @@ export default function AdultPage() {
 
       <div className="h-screen flex flex-col bg-background overflow-hidden lg:pl-64">
         {/* Sliver Header with CategoryMenu */}
-        <SliverHeader title="成人专区" scrollContainerSelector="#adult-main-scroll" searchHref="/search?source=adult">
+        <SliverHeader title={settings.site_name} scrollContainerSelector="#adult-main-scroll" searchHref="/search?source=adult">
           <CategoryMenu
             categories={categories}
             loading={categoriesLoading}

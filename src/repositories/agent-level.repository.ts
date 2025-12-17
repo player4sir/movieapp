@@ -1,4 +1,4 @@
-import { eq, desc, asc } from 'drizzle-orm';
+import { eq, asc } from 'drizzle-orm';
 import { BaseRepository } from './base.repository';
 import { agentLevels, AgentLevel } from '@/db/schema';
 import { RepositoryError } from './errors';

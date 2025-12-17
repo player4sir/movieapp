@@ -20,6 +20,7 @@ import {
   buildWorkerProxyUrl,
   CF_WORKER_PROXY_URL,
 } from '@/lib/proxy-config';
+import { verifyPlaybackToken } from '@/services/playback-token.service';
 
 // Force dynamic rendering to fix build errors with searchParams
 export const dynamic = 'force-dynamic';
@@ -27,17 +28,33 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const url = searchParams.get('url');
+    const token = searchParams.get('token');
 
-    if (!url) {
+    // SECURITY: Token is required - no legacy URL fallback allowed
+    if (!token) {
       return NextResponse.json(
-        { code: 'VALIDATION_ERROR', message: 'URL parameter is required' },
+        { code: 'FORBIDDEN', message: 'Valid playback token required' },
+        { status: 403 }
+      );
+    }
+
+    const payload = verifyPlaybackToken(token);
+    if (!payload) {
+      console.error('[TS Proxy] Token verification failed');
+      return NextResponse.json(
+        { code: 'FORBIDDEN', message: 'Invalid or expired playback token' },
+        { status: 403 }
+      );
+    }
+
+    const decodedUrl = payload.url;
+    if (!decodedUrl) {
+      return NextResponse.json(
+        { code: 'VALIDATION_ERROR', message: 'Token missing URL' },
         { status: 400 }
       );
     }
 
-    // Decode the URL
-    const decodedUrl = decodeURIComponent(url);
     const parsedUrl = new URL(decodedUrl);
     const domain = parsedUrl.hostname;
 

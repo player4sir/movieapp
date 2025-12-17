@@ -68,24 +68,11 @@ function generateId(): string {
   return crypto.randomUUID();
 }
 
-/**
- * Generate a unique order number.
- * Format: M + YYYYMMDD + 4-digit sequence (e.g., "M202312090001")
- * 
- * Requirements: 2.4
- */
+// Improved order number generation using timestamp + random for better uniqueness
 export function generateOrderNo(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  const dateStr = `${year}${month}${day}`;
-
-  // Generate a random 4-digit sequence for uniqueness
-  // In production, this could be a database sequence
-  const sequence = String(Math.floor(Math.random() * 10000)).padStart(4, '0');
-
-  return `M${dateStr}${sequence}`;
+  const now = Date.now();
+  const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+  return `M${now}${random}`;  // e.g., M1702876543210ABC123
 }
 
 // ============================================
@@ -244,18 +231,23 @@ export async function approveOrder(
     throw { ...ORDER_ERRORS.ORDER_ALREADY_PROCESSED };
   }
 
-  // Update order status
-  const updatedOrder = await membershipOrderRepository.update(orderId, {
-    status: 'approved',
-    reviewedBy: adminId,
-    reviewedAt: new Date(),
-  });
+  // Use conditional update to prevent race condition
+  const updatedOrder = await membershipOrderRepository.updateWithCondition(
+    orderId,
+    { status: ['pending', 'paid'] },
+    {
+      status: 'approved',
+      reviewedBy: adminId,
+      reviewedAt: new Date(),
+    }
+  );
 
   if (!updatedOrder) {
-    throw { ...ORDER_ERRORS.ORDER_NOT_FOUND };
+    // Another admin already processed this order
+    throw { ...ORDER_ERRORS.ORDER_ALREADY_PROCESSED };
   }
 
-  // Activate membership for user
+  // Activate membership for user - safe because we only reach here if update succeeded
   await activateMembership(
     order.userId,
     order.memberLevel,
@@ -289,15 +281,20 @@ export async function rejectOrder(
     throw { ...ORDER_ERRORS.ORDER_ALREADY_PROCESSED };
   }
 
-  const updatedOrder = await membershipOrderRepository.update(orderId, {
-    status: 'rejected',
-    reviewedBy: adminId,
-    reviewedAt: new Date(),
-    rejectReason: reason,
-  });
+  // Use conditional update to prevent race condition
+  const updatedOrder = await membershipOrderRepository.updateWithCondition(
+    orderId,
+    { status: ['pending', 'paid'] },
+    {
+      status: 'rejected',
+      reviewedBy: adminId,
+      reviewedAt: new Date(),
+      rejectReason: reason,
+    }
+  );
 
   if (!updatedOrder) {
-    throw { ...ORDER_ERRORS.ORDER_NOT_FOUND };
+    throw { ...ORDER_ERRORS.ORDER_ALREADY_PROCESSED };
   }
 
   return updatedOrder;

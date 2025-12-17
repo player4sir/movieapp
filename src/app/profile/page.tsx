@@ -22,12 +22,14 @@ import {
   Coins,
   CreditCard,
   Crown,
-  Sparkles
+  Sparkles,
+  KeyRound
 } from 'lucide-react';
 import { useAuth, useCoins } from '@/hooks';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { RechargeModal } from '@/components/coins';
 import { PaymentModal } from '@/components/membership';
+import { ChangePasswordModal } from '@/components/profile/ChangePasswordModal';
 import { AdSlotGroup } from '@/components/ads';
 
 // Membership level configuration
@@ -67,6 +69,7 @@ export default function ProfilePage() {
 
   const [showRecharge, setShowRecharge] = useState(false);
   const [showMembership, setShowMembership] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
   const [membership, setMembership] = useState<MembershipData | null>(null);
   const [checkinResult, setCheckinResult] = useState<{ coins: number; streak: number } | null>(null);
   const [debugClicks, setDebugClicks] = useState(0);
@@ -311,6 +314,11 @@ export default function ProfilePage() {
               icon={Crown}
               label="会员订单"
             />
+            <MenuItem
+              onClick={() => setShowChangePassword(true)}
+              icon={KeyRound}
+              label="修改密码"
+            />
           </div>
         </div>
 
@@ -360,6 +368,11 @@ export default function ProfilePage() {
       <PaymentModal
         isOpen={showMembership}
         onClose={() => setShowMembership(false)}
+      />
+
+      <ChangePasswordModal
+        isOpen={showChangePassword}
+        onClose={() => setShowChangePassword(false)}
       />
     </div >
   );

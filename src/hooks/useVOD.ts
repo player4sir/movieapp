@@ -1,13 +1,26 @@
 'use client';
 
-import useSWR from 'swr';
+import useSWR, { mutate } from 'swr';
 import useSWRInfinite from 'swr/infinite';
 import { useState, useCallback, useMemo } from 'react';
 import type { VODItem, Category } from '@/types/vod';
 import { globalFetcher, swrConfigs } from '@/lib/swr-config';
 
-
 type SourceCategory = 'normal' | 'adult';
+
+/**
+ * Prefetch VOD detail data for faster navigation
+ * Call on hover/touch to preload data before user clicks
+ */
+export function prefetchVODDetail(id: string | number, sourceCategory?: SourceCategory) {
+  const params = new URLSearchParams();
+  if (sourceCategory) params.set('sourceCategory', sourceCategory);
+  const queryString = params.toString();
+  const url = `/api/vod/${id}${queryString ? `?${queryString}` : ''}`;
+  
+  // Trigger SWR cache population without waiting
+  mutate(url, globalFetcher(url), { revalidate: false });
+}
 
 interface UseVODListOptions {
   pageSize?: number;

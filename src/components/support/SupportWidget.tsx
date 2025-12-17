@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { MessageCircle, X, Send, Bot, User } from 'lucide-react';
+import { MessageCircle, X, Bot, User } from 'lucide-react';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { usePathname } from 'next/navigation';
 
@@ -27,10 +27,10 @@ export function SupportWidget() {
     const [previewImage, setPreviewImage] = useState<string | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
 
-    // Hide on admin console pages
-    if (pathname?.startsWith('/console-x9k2m')) {
-        return null;
-    }
+    // Check if on pages where widget should be hidden (before early return to maintain hook order)
+    const isAdminPage = pathname?.startsWith('/console-x9k2m');
+    const isPlayPage = pathname?.startsWith('/play');
+    const shouldHide = isAdminPage || isPlayPage;
 
     // Parse FAQ config
     const faqList: FAQItem[] = settings.faq_config
@@ -86,6 +86,11 @@ export function SupportWidget() {
             setShowQuestions(true);
         }, 600);
     };
+
+    // Hide on admin console and play pages - AFTER all hooks
+    if (shouldHide) {
+        return null;
+    }
 
     return (
         <>

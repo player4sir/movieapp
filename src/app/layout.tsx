@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
-import { SupportWidget } from "@/components/support/SupportWidget";
 
 export const metadata: Metadata = {
   title: "影视流媒体",
@@ -48,7 +47,6 @@ export default function RootLayout({
       <body className="antialiased safe-area-inset" suppressHydrationWarning>
         <Providers>
           {children}
-          <SupportWidget />
         </Providers>
       </body>
     </html>

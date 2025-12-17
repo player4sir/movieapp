@@ -73,43 +73,31 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const token = searchParams.get('token');
-    const url = searchParams.get('url');
 
-    // 解析目标URL
-    let targetUrl = url;
-    let isPreview = false;
-
-    if (token) {
-      const payload = verifyPlaybackToken(token);
-      if (!payload) {
-        console.error('[M3U8 Proxy] Token verification failed', {
-          tokenLength: token.length,
-          tokenPrefix: token.substring(0, 20) + '...',
-        });
-        // 回退到legacy模式以支持移动端播放
-        if (url) {
-          console.log('[M3U8 Proxy] Falling back to legacy URL mode');
-          targetUrl = url;
-          isPreview = false;
-        } else {
-          return NextResponse.json(
-            { code: 'FORBIDDEN', message: 'Invalid or expired playback token' },
-            { status: 403 }
-          );
-        }
-      } else {
-        targetUrl = payload.url;
-        isPreview = payload.isPreview;
-      }
-    } else if (url) {
-      // Legacy模式：支持直接URL以保持向后兼容
-      targetUrl = url;
-      isPreview = false;
+    // SECURITY: Token is required - no legacy URL fallback allowed
+    if (!token) {
+      return NextResponse.json(
+        { code: 'FORBIDDEN', message: 'Valid playback token required' },
+        { status: 403 }
+      );
     }
 
+    const payload = verifyPlaybackToken(token);
+    if (!payload) {
+      console.error('[M3U8 Proxy] Token verification failed', {
+        tokenLength: token.length,
+        tokenPrefix: token.substring(0, 20) + '...',
+      });
+      return NextResponse.json(
+        { code: 'FORBIDDEN', message: 'Invalid or expired playback token' },
+        { status: 403 }
+      );
+    }
+
+    const targetUrl = payload.url;
     if (!targetUrl) {
       return NextResponse.json(
-        { code: 'VALIDATION_ERROR', message: 'URL is required' },
+        { code: 'VALIDATION_ERROR', message: 'Token missing URL' },
         { status: 400 }
       );
     }
@@ -314,10 +302,14 @@ export async function GET(request: NextRequest) {
         // 解析相对URL为绝对URL
         const absoluteUrl = resolveUrl(trimmedLine, baseUrl, finalOrigin);
 
-        // 代理.ts分段
+        // 代理.ts分段 - 使用签名 token 保护
         if (trimmedLine.endsWith('.ts') || trimmedLine.includes('.ts?') ||
           trimmedLine.includes('.ts#') || /\.ts\b/.test(trimmedLine)) {
-          return `/api/proxy/ts?url=${encodeURIComponent(absoluteUrl)}`;
+          const tsToken = generatePlaybackToken({
+            url: absoluteUrl,
+            isPreview: false
+          });
+          return `/api/proxy/ts?token=${tsToken}`;
         }
 
         // 代理嵌套的m3u8文件

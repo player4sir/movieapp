@@ -2,12 +2,23 @@
 
 import { ReactNode, useEffect, Suspense, useMemo } from 'react';
 import { SWRConfig } from 'swr';
+import dynamic from 'next/dynamic';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { CoinsProvider } from '@/contexts/CoinsContext';
-import { SplashAdWrapper } from '@/components/ads';
 import { setupGlobalFetchInterceptor } from '@/lib/api-client';
 import { ReferralTracker } from '@/components/referral/ReferralTracker';
 import { SiteTitle } from '@/components/layout';
+
+// Dynamic imports for non-critical components - reduces initial JS bundle
+const SplashAdWrapper = dynamic(
+  () => import('@/components/ads').then((mod) => mod.SplashAdWrapper),
+  { ssr: false }
+);
+
+const SupportWidget = dynamic(
+  () => import('@/components/support/SupportWidget').then((mod) => mod.SupportWidget),
+  { ssr: false }
+);
 
 // Global fetcher for SWR - defined inline to avoid circular dependencies
 const globalFetcher = async (url: string) => {
@@ -53,6 +64,7 @@ export function Providers({ children }: { children: ReactNode }) {
           <SiteTitle />
           {children}
           <SplashAdWrapper />
+          <SupportWidget />
           <Suspense fallback={null}>
             <ReferralTracker />
           </Suspense>

@@ -39,6 +39,35 @@ export class CoinOrderRepository extends BaseRepository {
         return order;
     }
 
+    /**
+     * Atomic conditional update - only updates if conditions are met.
+     * This prevents race conditions in approval flow.
+     * Returns undefined if conditions not met (e.g., status already changed).
+     */
+    async updateWithCondition(
+        id: string,
+        conditions: { status?: string[] },
+        data: Partial<NewCoinOrder>
+    ): Promise<CoinOrder | undefined> {
+        const whereConditions = [eq(coinOrders.id, id)];
+
+        // Add status condition if provided
+        if (conditions.status && conditions.status.length > 0) {
+            // Use SQL IN clause for multiple possible statuses
+            whereConditions.push(
+                sql`${coinOrders.status} IN (${sql.join(conditions.status.map(s => sql`${s}`), sql`, `)})`
+            );
+        }
+
+        const [order] = await this.db
+            .update(coinOrders)
+            .set({ ...data, updatedAt: new Date() })
+            .where(and(...whereConditions))
+            .returning();
+
+        return order; // undefined if no rows matched (condition not met)
+    }
+
     async findById(id: string): Promise<CoinOrder | undefined> {
         return this.db.query.coinOrders.findFirst({
             where: eq(coinOrders.id, id),
