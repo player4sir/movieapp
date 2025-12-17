@@ -48,7 +48,7 @@ export function PaywallStatsCard({ getAccessToken }: PaywallStatsCardProps) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [getAccessToken]);
 
   useEffect(() => {
     if (hasFetched.current) return;

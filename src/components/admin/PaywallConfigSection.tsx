@@ -202,12 +202,7 @@ export function PaywallConfigSection({ onShowToast }: PaywallConfigSectionProps)
   /**
    * Get edit value (for percentage configs, convert decimal to percentage)
    */
-  const getEditValue = (key: string, value: unknown): string => {
-    if (key === 'paywall_vip_discount' || key === 'paywall_preview_percentage') {
-      return String(Math.round((value as number) * 100));
-    }
-    return String(value);
-  };
+  // Note: getEditValue is available but value conversion is done inline in handleEdit
 
   if (loading) {
     return (

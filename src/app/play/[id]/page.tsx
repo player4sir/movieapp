@@ -488,7 +488,7 @@ function PlayPageContent() {
     if (currentSource && selectedEpisodeIndex < currentSource.episodes.length - 1) {
       handleEpisodeSelect(selectedSourceIndex, selectedEpisodeIndex + 1);
     }
-  }, [vod, selectedSourceIndex, selectedEpisodeIndex]);
+  }, [vod, selectedSourceIndex, selectedEpisodeIndex, handleEpisodeSelect]);
 
   // Stable callback handlers for VideoPlayer to prevent unnecessary remounts
   const handleVideoError = useCallback((err: string) => {

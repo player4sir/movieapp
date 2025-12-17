@@ -6,7 +6,7 @@
  * Show remark codes for verification
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { TableSkeleton, NetworkError } from './index';
 
 type OrderStatus = 'pending' | 'paid' | 'approved' | 'rejected';
@@ -196,9 +196,8 @@ export function CoinOrderList({
                                     const isExpanded = expandedOrderId === order.id;
 
                                     return (
-                                        <>
+                                        <React.Fragment key={order.id}>
                                             <tr
-                                                key={order.id}
                                                 onClick={() => toggleExpand(order.id)}
                                                 className={`hover:bg-surface-secondary/30 transition-colors cursor-pointer ${isExpanded ? 'bg-surface-secondary/30' : ''
                                                     }`}
@@ -276,7 +275,7 @@ export function CoinOrderList({
                                                     </td>
                                                 </tr>
                                             )}
-                                        </>
+                                        </React.Fragment>
                                     );
                                 })}
                             </tbody>

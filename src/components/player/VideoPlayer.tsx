@@ -23,7 +23,6 @@ import {
   getHLSConfig,
   getVideoSourceUrl,
   getPlayerPreferences,
-  savePlayerPreferences,
 } from '@/lib/player-utils';
 
 export interface VideoPlayerRef {
@@ -193,7 +192,7 @@ const ArtVideoPlayer = forwardRef<VideoPlayerRef, Omit<VideoPlayerProps, 'useIfr
       retryCount: 0,
       canRetry: true,
     });
-    const [gestureHint, setGestureHint] = useState<{ type: 'seek' | 'speed'; value: string } | null>(null);
+    const [gestureHint] = useState<{ type: 'seek' | 'speed'; value: string } | null>(null);
 
     // 横屏模式状态
     const [isFullscreen, setIsFullscreen] = useState(false);
@@ -201,8 +200,9 @@ const ArtVideoPlayer = forwardRef<VideoPlayerRef, Omit<VideoPlayerProps, 'useIfr
 
     // 长按状态
     const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
-    const originalPlaybackRateRef = useRef(1);
-    const isLongPressingRef = useRef(false);
+    // Long press refs reserved for future gesture features
+    // const originalPlaybackRateRef = useRef(1);
+    // const isLongPressingRef = useRef(false);
 
     // 屏幕唤醒锁管理 - 防止播放时屏幕休眠
     const requestWakeLock = useCallback(async () => {
@@ -685,13 +685,13 @@ const ArtVideoPlayer = forwardRef<VideoPlayerRef, Omit<VideoPlayerProps, 'useIfr
   }
 );
 
-// 格式化时间
-function formatTime(seconds: number): string {
-  if (!isFinite(seconds)) return '00:00';
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-}
+// 格式化时间 (reserved for future use)
+// function formatTime(seconds: number): string {
+//   if (!isFinite(seconds)) return '00:00';
+//   const mins = Math.floor(seconds / 60);
+//   const secs = Math.floor(seconds % 60);
+//   return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+// }
 
 // 主导出组件
 export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(

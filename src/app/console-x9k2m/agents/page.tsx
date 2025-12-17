@@ -164,7 +164,7 @@ export default function AgentsPage() {
         if (yuan >= 1000) return `¥${(yuan / 1000).toFixed(1)}k`;
         return `¥${yuan.toFixed(0)}`;
     };
-    const _formatRate = (bps: number) => `${(bps / 100).toFixed(1)}%`;
+
 
     // Open form for create
     const handleCreate = () => {
