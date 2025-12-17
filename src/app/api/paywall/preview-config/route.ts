@@ -22,7 +22,7 @@ export async function GET() {
         return NextResponse.json({
             percentage: 0.25,
             minSeconds: 60,
-            maxSeconds: 600,
+            maxSeconds: 360,
         }, { status: 200 });
     }
 }

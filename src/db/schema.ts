@@ -369,6 +369,9 @@ export const adSlots = pgTable('AdSlot', {
   width: integer('width').notNull(),
   height: integer('height').notNull(),
   rotationStrategy: rotationStrategyEnum('rotationStrategy').default('random').notNull(),
+  displayMode: varchar('displayMode', { length: 20 }).default('cover').notNull(), // 'cover' or 'contain'
+  maxVisible: integer('maxVisible').default(3).notNull(), // Max ads to show, rest go to carousel
+  carouselInterval: integer('carouselInterval').default(5).notNull(), // Carousel interval in seconds
   enabled: boolean('enabled').default(true).notNull(),
   createdAt: timestamp('createdAt').defaultNow().notNull(),
   updatedAt: timestamp('updatedAt').notNull(),

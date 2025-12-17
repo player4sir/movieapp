@@ -21,6 +21,8 @@ interface AdBannerProps {
   className?: string;
   /** Enable responsive sizing */
   responsive?: boolean;
+  /** Image display mode: cover (fill container, may crop) or contain (show full image) */
+  displayMode?: 'cover' | 'contain';
   onImpression?: () => void;
   onClick?: () => void;
 }
@@ -51,19 +53,31 @@ export const AdBanner = memo(function AdBanner({
   height = 90,
   className = '',
   responsive = true,
+  displayMode = 'cover',
   onImpression,
   onClick,
 }: AdBannerProps) {
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageRetryCount, setImageRetryCount] = useState(0);
   const impressionRecorded = useRef(false);
+  const clickInProgress = useRef(false);
+  const MAX_RETRY = 2;
 
   // Check if the image is a GIF
   const isGif = isGifUrl(ad.imageUrl);
 
-  // Record impression on mount (Requirements: 3.2)
+  // Record impression on mount with session deduplication (Requirements: 3.2)
   useEffect(() => {
     if (impressionRecorded.current) return;
+
+    // Check sessionStorage to prevent duplicate impressions for same ad in same session
+    const impressionKey = `ad_impression_${ad.id}`;
+    if (typeof window !== 'undefined' && sessionStorage.getItem(impressionKey)) {
+      impressionRecorded.current = true;
+      return;
+    }
+
     impressionRecorded.current = true;
 
     // Fire-and-forget impression tracking
@@ -71,6 +85,11 @@ export const AdBanner = memo(function AdBanner({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ adId: ad.id, slotId }),
+    }).then(() => {
+      // Mark as recorded in sessionStorage
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem(impressionKey, '1');
+      }
     }).catch(() => {
       // Silently ignore impression tracking errors
     });
@@ -78,10 +97,14 @@ export const AdBanner = memo(function AdBanner({
     onImpression?.();
   }, [ad.id, slotId, onImpression]);
 
-  // Handle click with tracking (Requirements: 3.3)
+  // Handle click with tracking and debounce (Requirements: 3.3)
   const handleClick = useCallback(async (e: React.MouseEvent) => {
     e.preventDefault();
-    
+
+    // Prevent double clicks
+    if (clickInProgress.current) return;
+    clickInProgress.current = true;
+
     onClick?.();
 
     try {
@@ -92,7 +115,7 @@ export const AdBanner = memo(function AdBanner({
       });
 
       const data = await response.json();
-      
+
       // Redirect to target URL
       if (data.targetUrl) {
         window.open(data.targetUrl, '_blank', 'noopener,noreferrer');
@@ -103,8 +126,24 @@ export const AdBanner = memo(function AdBanner({
     } catch {
       // On error, still redirect using the ad's target URL
       window.open(ad.targetUrl, '_blank', 'noopener,noreferrer');
+    } finally {
+      // Reset click lock after a short delay
+      setTimeout(() => {
+        clickInProgress.current = false;
+      }, 1000);
     }
   }, [ad.id, ad.targetUrl, slotId, onClick]);
+
+  // Handle image error with retry
+  const handleImageError = useCallback(() => {
+    if (imageRetryCount < MAX_RETRY) {
+      setImageRetryCount(prev => prev + 1);
+      // Force re-render by toggling error state
+      setImageLoaded(false);
+    } else {
+      setImageError(true);
+    }
+  }, [imageRetryCount]);
 
   if (imageError) {
     return null; // Hide banner if image fails to load
@@ -127,22 +166,21 @@ export const AdBanner = memo(function AdBanner({
     >
       {/* Loading skeleton */}
       {!imageLoaded && (
-        <div 
+        <div
           className="absolute inset-0 bg-surface-secondary animate-pulse rounded-lg"
         />
       )}
-      
+
       {/* Use native img for GIFs to preserve animation, Next/Image for others */}
       {isGif ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={ad.imageUrl}
           alt={ad.title}
-          className={`object-cover w-full h-full rounded-lg transition-opacity duration-300 ${
-            imageLoaded ? 'opacity-100' : 'opacity-0'
-          }`}
+          className={`w-full h-full rounded-lg transition-opacity duration-300 ${displayMode === 'contain' ? 'object-contain' : 'object-cover'
+            } ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
           onLoad={() => setImageLoaded(true)}
-          onError={() => setImageError(true)}
+          onError={handleImageError}
         />
       ) : (
         <Image
@@ -150,16 +188,15 @@ export const AdBanner = memo(function AdBanner({
           alt={ad.title}
           width={width}
           height={height}
-          className={`object-cover w-full h-full rounded-lg transition-opacity duration-300 ${
-            imageLoaded ? 'opacity-100' : 'opacity-0'
-          }`}
+          className={`w-full h-full rounded-lg transition-opacity duration-300 ${displayMode === 'contain' ? 'object-contain' : 'object-cover'
+            } ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
           onLoad={() => setImageLoaded(true)}
-          onError={() => setImageError(true)}
+          onError={handleImageError}
           priority={false}
           sizes={responsive ? '(max-width: 768px) 100vw, 728px' : undefined}
         />
       )}
-      
+
       {/* Ad indicator badge */}
       <span className="absolute bottom-1 right-1 px-1.5 py-0.5 text-[10px] font-medium text-white/80 bg-black/50 rounded">
         广告

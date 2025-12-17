@@ -71,6 +71,8 @@ export default function AdminAdSlotsPage() {
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [assigningPosition, setAssigningPosition] = useState<string | null>(null);
   const [togglingSlot, setTogglingSlot] = useState<string | null>(null);
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [editingSlot, setEditingSlot] = useState<SlotWithAds | null>(null);
   const hasFetched = useRef(false);
 
   const fetchData = useCallback(async () => {
@@ -86,7 +88,7 @@ export default function AdminAdSlotsPage() {
       if (slotsRes.ok) {
         const slotsData = await slotsRes.json();
         const slotsMap = new Map<string, SlotWithAds>();
-        
+
         await Promise.all(
           (slotsData.data || []).map(async (slot: AdSlot) => {
             const assignedRes = await fetch(`/api/admin/ads/slots/${slot.id}/assign`, {
@@ -121,9 +123,9 @@ export default function AdminAdSlotsPage() {
   const handleToggleSlot = async (preset: PresetSlot, currentSlot: SlotWithAds | undefined) => {
     const token = getAccessToken();
     if (!token) return;
-    
+
     setTogglingSlot(preset.position);
-    
+
     try {
       if (currentSlot) {
         // Toggle existing slot
@@ -141,7 +143,7 @@ export default function AdminAdSlotsPage() {
           });
         }
       } else {
-        // Create new slot
+        // Create new slot with all fields
         const res = await fetch('/api/admin/ads/slots', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -151,6 +153,9 @@ export default function AdminAdSlotsPage() {
             width: preset.width,
             height: preset.height,
             rotationStrategy: 'random',
+            displayMode: 'cover',
+            maxVisible: 3,
+            carouselInterval: 5,
             enabled: true,
           }),
         });
@@ -178,7 +183,7 @@ export default function AdminAdSlotsPage() {
   const handleAssignAd = async (adId: string) => {
     const token = getAccessToken();
     if (!token || !assigningPosition) return;
-    
+
     const slot = slots.get(assigningPosition);
     if (!slot) return;
 
@@ -209,15 +214,14 @@ export default function AdminAdSlotsPage() {
   const handleRemoveAd = async (position: string, adId: string) => {
     const token = getAccessToken();
     if (!token) return;
-    
+
     const slot = slots.get(position);
     if (!slot) return;
 
     try {
-      const res = await fetch(`/api/admin/ads/slots/${slot.id}/assign`, {
+      const res = await fetch(`/api/admin/ads/slots/${slot.id}/assign?adId=${encodeURIComponent(adId)}`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ adId }),
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (res.ok) {
@@ -247,6 +251,35 @@ export default function AdminAdSlotsPage() {
       if (preset) return preset.name;
     }
     return assigningPosition;
+  };
+
+  const handleOpenSettings = (slot: SlotWithAds) => {
+    setEditingSlot(slot);
+    setSettingsModalOpen(true);
+  };
+
+  const handleSaveSettings = async () => {
+    const token = getAccessToken();
+    if (!token || !editingSlot) return;
+
+    try {
+      const res = await fetch(`/api/admin/ads/slots/${editingSlot.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(editingSlot),
+      });
+
+      if (res.ok) {
+        setSlots(prev => {
+          const newMap = new Map(prev);
+          newMap.set(editingSlot.position, editingSlot);
+          return newMap;
+        });
+        setSettingsModalOpen(false);
+      }
+    } catch (err) {
+      console.error('Save settings error:', err);
+    }
   };
 
 
@@ -288,13 +321,13 @@ export default function AdminAdSlotsPage() {
             <div className="px-4 py-3 bg-surface-secondary/50 border-b border-surface-secondary">
               <h2 className="font-medium">{group.page}</h2>
             </div>
-            
+
             <div className="divide-y divide-surface-secondary">
               {group.slots.map(preset => {
                 const slot = slots.get(preset.position);
                 const isEnabled = slot?.enabled ?? false;
                 const isToggling = togglingSlot === preset.position;
-                
+
                 return (
                   <div key={preset.position} className="p-4">
                     <div className="flex items-start justify-between mb-2">
@@ -306,34 +339,44 @@ export default function AdminAdSlotsPage() {
                         <p className="text-xs text-foreground/50">{preset.description}</p>
                         <p className="text-xs text-foreground/40 mt-1">尺寸: {preset.width}×{preset.height}</p>
                       </div>
-                      
+
                       <div className="flex items-center gap-2">
-                        {isEnabled && (
-                          <button
-                            onClick={() => handleOpenAssign(preset.position)}
-                            className="p-2 rounded-lg hover:bg-surface-secondary text-foreground/60 hover:text-primary"
-                            title="分配广告"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                            </svg>
-                          </button>
+                        {isEnabled && slot && (
+                          <>
+                            <button
+                              onClick={() => handleOpenSettings(slot)}
+                              className="p-2 rounded-lg hover:bg-surface-secondary text-foreground/60 hover:text-foreground"
+                              title="广告位设置"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => handleOpenAssign(preset.position)}
+                              className="p-2 rounded-lg hover:bg-surface-secondary text-foreground/60 hover:text-primary"
+                              title="分配广告"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                              </svg>
+                            </button>
+                          </>
                         )}
-                        
+
                         <button
                           onClick={() => handleToggleSlot(preset, slot)}
                           disabled={isToggling}
-                          className={`relative w-12 h-6 rounded-full transition-colors ${
-                            isEnabled ? 'bg-primary' : 'bg-foreground/20'
-                          } ${isToggling ? 'opacity-50' : ''}`}
+                          className={`relative w-12 h-6 rounded-full transition-colors ${isEnabled ? 'bg-primary' : 'bg-foreground/20'
+                            } ${isToggling ? 'opacity-50' : ''}`}
                         >
-                          <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                            isEnabled ? 'left-7' : 'left-1'
-                          }`} />
+                          <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${isEnabled ? 'left-7' : 'left-1'
+                            }`} />
                         </button>
                       </div>
                     </div>
-                    
+
                     {isEnabled && slot && (
                       <div className="mt-3 pt-3 border-t border-surface-secondary/50">
                         {slot.assignedAds.length > 0 ? (
@@ -377,7 +420,7 @@ export default function AdminAdSlotsPage() {
         <div className="fixed inset-0 bg-black/50 flex items-end lg:items-center justify-center z-50" onClick={() => setAssignModalOpen(false)}>
           <div className="bg-background rounded-t-xl lg:rounded-lg p-5 w-full lg:max-w-md max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <h2 className="text-lg font-semibold mb-4">分配广告到「{getAssigningSlotName()}」</h2>
-            
+
             {getAvailableAds().length === 0 ? (
               <div className="text-center py-8 text-foreground/50">
                 <p>没有可分配的广告</p>
@@ -386,8 +429,8 @@ export default function AdminAdSlotsPage() {
             ) : (
               <div className="space-y-2">
                 {getAvailableAds().map(ad => (
-                  <div 
-                    key={ad.id} 
+                  <div
+                    key={ad.id}
                     className="flex items-center justify-between bg-surface rounded-lg p-3 hover:bg-surface-secondary cursor-pointer"
                     onClick={() => handleAssignAd(ad.id)}
                   >
@@ -407,8 +450,65 @@ export default function AdminAdSlotsPage() {
                 ))}
               </div>
             )}
-            
+
             <button onClick={() => setAssignModalOpen(false)} className="btn-secondary w-full py-2.5 mt-4">关闭</button>
+          </div>
+        </div>
+      )}
+
+      {/* Settings Modal */}
+      {settingsModalOpen && editingSlot && (
+        <div className="fixed inset-0 bg-black/50 flex items-end lg:items-center justify-center z-50" onClick={() => setSettingsModalOpen(false)}>
+          <div className="bg-background rounded-t-xl lg:rounded-lg p-5 w-full lg:max-w-md" onClick={e => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold mb-4">广告位设置 - {editingSlot.name}</h2>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">图片显示模式</label>
+                <select
+                  value={editingSlot.displayMode ?? 'cover'}
+                  onChange={(e) => setEditingSlot({ ...editingSlot, displayMode: e.target.value as 'cover' | 'contain' })}
+                  className="input w-full"
+                >
+                  <option value="cover">填充裁剪 (cover)</option>
+                  <option value="contain">完整显示 (contain)</option>
+                </select>
+                <p className="text-xs text-foreground/50 mt-1">
+                  {editingSlot.displayMode === 'contain' ? '完整显示图片，可能有边距' : '图片填满容器，可能裁剪边缘'}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">最大展示数</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    value={editingSlot.maxVisible ?? 3}
+                    onChange={(e) => setEditingSlot({ ...editingSlot, maxVisible: parseInt(e.target.value) || 3 })}
+                    className="input w-full"
+                  />
+                  <p className="text-xs text-foreground/50 mt-1">超出部分轮播</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">轮播间隔 (秒)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="30"
+                    value={editingSlot.carouselInterval ?? 5}
+                    onChange={(e) => setEditingSlot({ ...editingSlot, carouselInterval: parseInt(e.target.value) || 5 })}
+                    className="input w-full"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setSettingsModalOpen(false)} className="btn-secondary flex-1 py-2.5">取消</button>
+              <button onClick={handleSaveSettings} className="btn-primary flex-1 py-2.5">保存</button>
+            </div>
           </div>
         </div>
       )}

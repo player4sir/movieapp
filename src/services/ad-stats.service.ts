@@ -256,3 +256,69 @@ export async function getAllSlotsStats(
 
   return results;
 }
+
+// ============================================
+// Daily Trend Statistics
+// ============================================
+
+export interface DailyStats {
+  date: string; // YYYY-MM-DD format
+  impressions: number;
+  clicks: number;
+  ctr: number;
+}
+
+export interface TrendStatsResult {
+  totalImpressions: number;
+  totalClicks: number;
+  averageCtr: number;
+  dailyStats: DailyStats[];
+}
+
+/**
+ * Get daily aggregated statistics for a date range.
+ * Useful for trend charts and performance analysis.
+ * 
+ * @param days - Number of days to look back (default: 7)
+ */
+export async function getDailyStats(days: number = 7): Promise<TrendStatsResult> {
+  const dailyStats: DailyStats[] = [];
+  let totalImpressions = 0;
+  let totalClicks = 0;
+
+  // Generate date range for each day
+  for (let i = days - 1; i >= 0; i--) {
+    const date = new Date();
+    date.setDate(date.getDate() - i);
+    date.setHours(0, 0, 0, 0);
+
+    const nextDate = new Date(date);
+    nextDate.setDate(nextDate.getDate() + 1);
+
+    const dateRange: AdDateRange = {
+      startDate: date,
+      endDate: nextDate,
+    };
+
+    const impressions = await adImpressionRepository.countByDateRange(dateRange);
+    const clicks = await adClickRepository.countByDateRange(dateRange);
+    const ctr = calculateCtr(impressions, clicks);
+
+    totalImpressions += impressions;
+    totalClicks += clicks;
+
+    dailyStats.push({
+      date: date.toISOString().split('T')[0], // YYYY-MM-DD
+      impressions,
+      clicks,
+      ctr,
+    });
+  }
+
+  return {
+    totalImpressions,
+    totalClicks,
+    averageCtr: calculateCtr(totalImpressions, totalClicks),
+    dailyStats,
+  };
+}

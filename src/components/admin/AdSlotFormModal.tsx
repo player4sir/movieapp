@@ -13,6 +13,9 @@ export interface AdSlotFormData {
   width: number;
   height: number;
   rotationStrategy: 'random' | 'sequential';
+  displayMode: 'cover' | 'contain';
+  maxVisible: number;
+  carouselInterval: number;
   enabled: boolean;
 }
 
@@ -26,6 +29,9 @@ export interface AdSlot {
   width: number;
   height: number;
   rotationStrategy: 'random' | 'sequential';
+  displayMode?: 'cover' | 'contain';
+  maxVisible?: number;
+  carouselInterval?: number;
   enabled: boolean;
   createdAt: string;
   updatedAt: string;
@@ -59,6 +65,9 @@ export function AdSlotFormModal({ isOpen, onClose, onSubmit, initialData, title 
     width: 300,
     height: 100,
     rotationStrategy: 'random',
+    displayMode: 'cover',
+    maxVisible: 3,
+    carouselInterval: 5,
     enabled: true,
   });
 
@@ -71,6 +80,9 @@ export function AdSlotFormModal({ isOpen, onClose, onSubmit, initialData, title 
           width: initialData.width,
           height: initialData.height,
           rotationStrategy: initialData.rotationStrategy,
+          displayMode: initialData.displayMode ?? 'cover',
+          maxVisible: initialData.maxVisible ?? 3,
+          carouselInterval: initialData.carouselInterval ?? 5,
           enabled: initialData.enabled,
         });
       } else {
@@ -80,6 +92,9 @@ export function AdSlotFormModal({ isOpen, onClose, onSubmit, initialData, title 
           width: 300,
           height: 100,
           rotationStrategy: 'random',
+          displayMode: 'cover',
+          maxVisible: 3,
+          carouselInterval: 5,
           enabled: true,
         });
       }
@@ -179,6 +194,49 @@ export function AdSlotFormModal({ isOpen, onClose, onSubmit, initialData, title 
               <option value="random">随机展示</option>
               <option value="sequential">顺序轮播</option>
             </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">图片显示模式</label>
+            <select
+              value={formData.displayMode}
+              onChange={(e) => setFormData({ ...formData, displayMode: e.target.value as 'cover' | 'contain' })}
+              className="input w-full"
+            >
+              <option value="cover">填充裁剪 (cover)</option>
+              <option value="contain">完整显示 (contain)</option>
+            </select>
+            <p className="text-xs text-foreground/50 mt-1">
+              {formData.displayMode === 'cover' ? '图片填满容器，可能裁剪边缘' : '完整显示图片，可能有边距'}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">最大展示数</label>
+              <input
+                type="number"
+                required
+                min="1"
+                max="10"
+                value={formData.maxVisible}
+                onChange={(e) => setFormData({ ...formData, maxVisible: parseInt(e.target.value) || 3 })}
+                className="input w-full"
+              />
+              <p className="text-xs text-foreground/50 mt-1">超出部分轮播</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">轮播间隔 (秒)</label>
+              <input
+                type="number"
+                required
+                min="1"
+                max="30"
+                value={formData.carouselInterval}
+                onChange={(e) => setFormData({ ...formData, carouselInterval: parseInt(e.target.value) || 5 })}
+                className="input w-full"
+              />
+            </div>
           </div>
 
           <div className="flex items-center gap-2">

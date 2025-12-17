@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react';
 import { AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 import { SliverHeader, BottomNav, PullToRefresh, VODGrid, CategoryMenu, Sidebar } from '@/components';
-import { AdSlot } from '@/components/ads';
+import { AdSlotGroup } from '@/components/ads';
 import { useVODList, useCategories, useInfiniteScroll } from '@/hooks';
 
 export default function HomePage() {
@@ -51,13 +51,11 @@ export default function HomePage() {
         <main id="main-scroll" className="flex-1 overflow-auto pt-[calc(56px+100px)] bg-surface dark:bg-background">
           <PullToRefresh onRefresh={refresh} className="min-h-full" disableScroll>
 
-            {/* Ad Slot - home_top position below header (Requirements: 3.1) */}
+            {/* Ad Slot Group - home_top position (shows all assigned ads) */}
             <div className="px-4 py-3">
-              <AdSlot
+              <AdSlotGroup
                 position="home_top"
-                width={728}
-                height={90}
-                className="w-full max-w-full rounded-xl overflow-hidden shadow-sm"
+                className="w-full max-w-full"
               />
             </div>
 

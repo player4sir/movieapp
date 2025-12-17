@@ -28,7 +28,7 @@ import { useAuth, useCoins } from '@/hooks';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { RechargeModal } from '@/components/coins';
 import { PaymentModal } from '@/components/membership';
-import { AdSlot } from '@/components/ads';
+import { AdSlotGroup } from '@/components/ads';
 
 // Membership level configuration
 const MEMBER_CONFIG = {
@@ -315,10 +315,8 @@ export default function ProfilePage() {
         </div>
 
         {/* Ad Slot */}
-        <AdSlot
+        <AdSlotGroup
           position="profile_bottom"
-          width={728}
-          height={90}
           className="rounded-2xl overflow-hidden"
         />
 

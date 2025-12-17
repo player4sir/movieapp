@@ -22,7 +22,7 @@ const VideoPlayer = dynamic(
 // Type import can stay, it doesn't affect bundle
 import type { VideoPlayerRef } from '@/components/player';
 import { UnlockPromptModal } from '@/components/paywall';
-import { AdSlot } from '@/components/ads';
+import { AdSlotGroup } from '@/components/ads';
 import { useVODDetail, useContentAccess, useAuth } from '@/hooks';
 
 type SourceCategory = 'normal' | 'adult';
@@ -82,9 +82,10 @@ function PlayPageContent() {
   const [showResumePrompt, setShowResumePrompt] = useState(false);
   const [savedPosition, setSavedPosition] = useState(0);
   const [showEpisodeList, setShowEpisodeList] = useState(false);
-  // 开发阶段默认开启广告过滤，方便测试
-  const [adFreeEnabled, setAdFreeEnabled] = useState(true);
-  const [isPremiumUser, setIsPremiumUser] = useState(true);
+  // 广告过滤状态 - 初始为 undefined 表示未检测
+  const [adFreeEnabled, setAdFreeEnabled] = useState<boolean | undefined>(undefined);
+  const [isPremiumUser, setIsPremiumUser] = useState(false);
+  const [subscriptionChecked, setSubscriptionChecked] = useState(false); // 等待订阅状态检查完成
   // VIP/SVIP 状态
   const [isVipUser, setIsVipUser] = useState(false);  // VIP: normal content only
   const [isSvipUser, setIsSvipUser] = useState(false); // SVIP: all content
@@ -105,8 +106,12 @@ function PlayPageContent() {
 
   // Refs for tracking
   const lastSaveTimeRef = useRef(0);
+  const lastPreviewUpdateRef = useRef(0); // Throttle preview time display updates
   const saveIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const videoRef = useRef<VideoPlayerRef>(null);
+  // Lock the video URL to prevent SWR revalidation from changing it during playback
+  const lockedVideoUrlRef = useRef<string>('');
+  const currentEpisodeKeyRef = useRef<string>(''); // Track current episode to detect real changes
 
   // Auto-select m3u8 source if no source param provided
   useEffect(() => {
@@ -139,7 +144,7 @@ function PlayPageContent() {
       } catch (err) {
         console.error('Failed to fetch preview config:', err);
         // Use defaults
-        setPreviewConfig({ percentage: 0.25, minSeconds: 60, maxSeconds: 600 });
+        setPreviewConfig({ percentage: 0.25, minSeconds: 60, maxSeconds: 360 });
       }
     };
     fetchPreviewConfig();
@@ -154,9 +159,6 @@ function PlayPageContent() {
 
     const checkContentAccess = async () => {
       const result = await checkAccess(vod.vod_id, selectedEpisodeIndex, sourceCategory);
-
-      // Debug: Log access check result
-      console.log('[Preview] checkAccess result:', result);
 
       if (result) {
         setHasAccess(result.hasAccess);
@@ -191,6 +193,9 @@ function PlayPageContent() {
           if (typeof data.isPremium === 'boolean') {
             setIsPremiumUser(data.isPremium);
             setAdFreeEnabled(data.isPremium);
+          } else {
+            // 默认不开启广告过滤
+            setAdFreeEnabled(false);
           }
           // Update VIP/SVIP status
           if (typeof data.isVip === 'boolean') {
@@ -199,9 +204,15 @@ function PlayPageContent() {
           if (typeof data.isSvip === 'boolean') {
             setIsSvipUser(data.isSvip);
           }
+        } else {
+          // 请求失败时设置默认值
+          setAdFreeEnabled(false);
         }
       } catch {
         // Keep default values
+        setAdFreeEnabled(false);
+      } finally {
+        setSubscriptionChecked(true); // 标记检查完成
       }
     };
     checkPremiumStatus();
@@ -310,11 +321,6 @@ function PlayPageContent() {
     // Save progress
     saveProgress(currentTime, duration);
 
-    // Debug: Log access state (only once every 5 seconds to avoid spam)
-    if (Math.floor(currentTime) % 5 === 0) {
-      console.log('[Preview] Access state:', { hasAccess, accessType, previewConfig: !!previewConfig, previewDuration });
-    }
-
     // Only process preview logic for locked content
     if (!hasAccess && accessType === 'locked' && previewConfig) {
       // Calculate preview duration once when we first get a VALID video duration
@@ -327,27 +333,29 @@ function PlayPageContent() {
           Math.max(percentageDuration, previewConfig.minSeconds),
           previewConfig.maxSeconds
         );
-        // Don't exceed total duration
-        const finalDuration = Math.min(calculatedDuration, duration);
-        console.log('[Preview] Video duration confirmed:', duration, 'seconds');
-        console.log('[Preview] Calculated preview duration:', finalDuration, 'seconds');
+        // Don't exceed total duration, ensure integer
+        const finalDuration = Math.floor(Math.min(calculatedDuration, duration));
         setPreviewDuration(finalDuration);
         setPreviewTimeLeft(finalDuration);
         return; // Don't check end on the same frame we calculate
       }
 
-      // Update remaining preview time for display
+      // Update remaining preview time for display (throttled to once per second)
       if (previewDuration > 0 && !previewEnded) {
-        const remaining = Math.max(0, previewDuration - currentTime);
-        setPreviewTimeLeft(remaining);
+        const remaining = Math.floor(Math.max(0, previewDuration - currentTime));
 
-        // Debug log
-        console.log('[Preview] Current:', currentTime.toFixed(1), '/ Preview limit:', previewDuration, '/ Remaining:', remaining.toFixed(1));
+        // Only update state once per second to avoid excessive re-renders
+        const now = Date.now();
+        if (now - lastPreviewUpdateRef.current >= 1000) {
+          lastPreviewUpdateRef.current = now;
+          setPreviewTimeLeft(remaining);
+        }
 
-        // Only check end after video actually started playing (at least 3 seconds in)
+        // Only check end after:
+        // 1. previewDuration is calculated (> 0)
+        // 2. video actually started playing (at least 3 seconds in)
         // This gives time for the player to settle after seeking
-        if (currentTime >= 3 && currentTime >= previewDuration) {
-          console.log('[Preview] Preview ended at', currentTime, 'seconds (limit was', previewDuration, ')');
+        if (previewDuration > 0 && currentTime >= 3 && currentTime >= previewDuration) {
           setPreviewEnded(true);
           setShowUnlockModal(true);
           // Pause the video
@@ -379,13 +387,15 @@ function PlayPageContent() {
       // Invalidate cache for this content
       invalidateCache(vod.vod_id, selectedEpisodeIndex);
 
+      // Clear locked URL to allow new token from VOD refresh
+      lockedVideoUrlRef.current = '';
+
       // Refresh VOD data to get new tokens with full access (non-preview)
+      // The VideoPlayer will remount with the new URL
       await refresh();
 
-      // Resume playback
-      if (videoRef.current) {
-        videoRef.current.play();
-      }
+      // Note: Don't call play() here - the VideoPlayer will auto-play after remounting
+      // because HLS.js auto-plays after manifest load
     }
   }, [vod, selectedEpisodeIndex, sourceCategory, unlockContent, invalidateCache, refresh]);
 
@@ -457,6 +467,14 @@ function PlayPageContent() {
     setShowUnlockModal(false);
     setHasAccess(null);
 
+    // Reset preview state for new episode
+    setPreviewDuration(0);
+    setPreviewTimeLeft(0);
+    setPreviewEnded(false);
+
+    // Clear locked URL to allow new episode URL
+    lockedVideoUrlRef.current = '';
+
     // Update URL without navigation
     const url = new URL(window.location.href);
     url.searchParams.set('source', sourceIndex.toString());
@@ -464,16 +482,25 @@ function PlayPageContent() {
     window.history.replaceState({}, '', url.toString());
   };
 
-  const handleVideoEnded = () => {
+  const handleVideoEnded = useCallback(() => {
     // Auto-play next episode if available
     const currentSource = vod?.playSources?.[selectedSourceIndex];
     if (currentSource && selectedEpisodeIndex < currentSource.episodes.length - 1) {
       handleEpisodeSelect(selectedSourceIndex, selectedEpisodeIndex + 1);
     }
-  };
+  }, [vod, selectedSourceIndex, selectedEpisodeIndex]);
 
-  // Show loading while checking auth, auto-selecting source, loading data, or checking access
-  if (authLoading || loading || selectedSourceIndex === -1 || (hasAccess === null && accessLoading)) {
+  // Stable callback handlers for VideoPlayer to prevent unnecessary remounts
+  const handleVideoError = useCallback((err: string) => {
+    console.error('[PlayPage] Video error:', err);
+  }, []);
+
+  const handleSourceSwitch = useCallback(() => {
+    setShowEpisodeList(true);
+  }, []);
+
+  // Show loading while checking auth, auto-selecting source, loading data, checking access, or waiting for subscription
+  if (authLoading || loading || selectedSourceIndex === -1 || (hasAccess === null && accessLoading) || !subscriptionChecked) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <svg className="w-12 h-12 animate-spin text-white" fill="none" viewBox="0 0 24 24">
@@ -525,16 +552,25 @@ function PlayPageContent() {
   // - If already a proxy URL (with token), just add adFree param if needed
   // - If raw m3u8 URL, wrap in proxy
   // - Otherwise use as-is (for iframe/external players)
-  let videoUrl = rawVideoUrl;
+  let computedVideoUrl = rawVideoUrl;
   if (isProxyUrl) {
     // Already tokenized proxy URL from VOD API, just add adFree if enabled
     const adFreeParam = adFreeEnabled ? '&adFree=true' : '';
-    videoUrl = `${rawVideoUrl}${adFreeParam}`;
+    computedVideoUrl = `${rawVideoUrl}${adFreeParam}`;
   } else if (rawVideoUrl.toLowerCase().includes('.m3u8')) {
     // Raw m3u8 URL, wrap in video proxy for CORS/mixed content handling
     const adFreeParam = adFreeEnabled ? '&adFree=true' : '';
-    videoUrl = `/api/proxy/video?url=${encodeURIComponent(rawVideoUrl)}${adFreeParam}`;
+    computedVideoUrl = `/api/proxy/video?url=${encodeURIComponent(rawVideoUrl)}${adFreeParam}`;
   }
+
+  // Lock the video URL to prevent changes during playback
+  // Only update when episode actually changes (detected by source+episode index)
+  const episodeKey = `${selectedSourceIndex}:${selectedEpisodeIndex}`;
+  if (currentEpisodeKeyRef.current !== episodeKey || !lockedVideoUrlRef.current) {
+    currentEpisodeKeyRef.current = episodeKey;
+    lockedVideoUrlRef.current = computedVideoUrl;
+  }
+  const videoUrl = lockedVideoUrlRef.current;
 
   // Use iframe for external player pages (non-m3u8, non-proxy)
   const useIframe = !isM3u8 && rawVideoUrl.includes('/share/');
@@ -586,9 +622,10 @@ function PlayPageContent() {
               initialPosition={initialPosition}
               onTimeUpdate={handleTimeUpdate}
               onEnded={handleVideoEnded}
-              onError={(err) => console.error('[PlayPage] Video error:', err)}
-              onSourceSwitch={() => setShowEpisodeList(true)}
+              onError={handleVideoError}
+              onSourceSwitch={handleSourceSwitch}
               useIframe={useIframe}
+              maxSeekTime={isLocked && previewDuration > 0 ? previewDuration : undefined}
             />
             {/* Preview time indicator for locked content */}
             {isLocked && previewDuration > 0 && !previewEnded && (
@@ -716,12 +753,10 @@ function PlayPageContent() {
         </div>
       </div>
 
-      {/* Ad Slot - play_bottom position below video info (Requirements: 3.1) */}
+      {/* Ad Slot - play_bottom position below video info */}
       <div className="px-4 pb-4">
-        <AdSlot
+        <AdSlotGroup
           position="play_bottom"
-          width={728}
-          height={90}
           className="w-full max-w-full"
         />
       </div>

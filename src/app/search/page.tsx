@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { VODGrid } from '@/components/vod';
 import { Sidebar } from '@/components/layout';
-import { AdSlot } from '@/components/ads';
+import { AdSlotGroup } from '@/components/ads';
 import { useSearch, useInfiniteScroll } from '@/hooks';
 
 function SearchPageContent() {
@@ -108,11 +108,9 @@ function SearchPageContent() {
         <main className="pt-14 pb-safe-bottom">
           {/* Ad Slot - search_top position (Requirements: 3.1) */}
           <div className="px-4 py-3">
-            <AdSlot
+            <AdSlotGroup
               position="search_top"
-              width={728}
-              height={90}
-              className="w-full max-w-full rounded-xl overflow-hidden shadow-sm"
+              className="w-full"
             />
           </div>
 

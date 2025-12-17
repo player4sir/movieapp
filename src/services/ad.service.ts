@@ -103,6 +103,7 @@ export interface AdDeliveryContext {
 
 export interface AdWithSlotInfo extends Ad {
   slotId?: string;
+  displayMode?: 'cover' | 'contain'; // Backend-controlled image display mode
 }
 
 // ============================================
@@ -127,16 +128,14 @@ export function isAdActive(ad: Ad, currentDate?: Date): boolean {
 }
 
 /**
- * Check if a user should see ads based on their member level.
- * Only SVIP users should not see ads.
- * Free and VIP users will see ads.
+ * Check if a user should see ads.
+ * All users see ads (no VIP/SVIP exemption as per business requirement).
  * 
- * Requirements: 4.1, 4.2, 4.3
+ * Note: Previously only SVIP users were exempt. Now all users see ads.
  */
-export function shouldShowAds(memberLevel?: MemberLevel): boolean {
-  if (!memberLevel) return true; // Anonymous users see ads
-  // Only SVIP users don't see ads
-  return memberLevel !== 'svip';
+export function shouldShowAds(_memberLevel?: MemberLevel): boolean {
+  // All users see ads - no exemption for any member level
+  return true;
 }
 
 /**
@@ -180,6 +179,11 @@ export function matchesTargeting(
 /**
  * Select an ad from a list based on rotation strategy.
  * 
+ * - 'random': Weighted random selection based on ad priority.
+ *   Higher priority ads have higher chance of being selected.
+ *   Priority 0 is treated as weight 1, priority N is treated as weight N+1.
+ * - 'sequential': Round-robin selection based on index.
+ * 
  * Requirements: 2.4
  */
 export function selectAdByRotation(
@@ -194,9 +198,25 @@ export function selectAdByRotation(
     return ads[index];
   }
 
-  // Random rotation (default)
-  const randomIndex = Math.floor(Math.random() * ads.length);
-  return ads[randomIndex];
+  // Weighted random rotation (default)
+  // Use priority as weight: priority 0 = weight 1, priority 5 = weight 6
+  const weights = ads.map(ad => (ad.priority ?? 0) + 1);
+  const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+
+  // Generate random value in range [0, totalWeight)
+  const random = Math.random() * totalWeight;
+
+  // Select ad based on cumulative weight
+  let cumulative = 0;
+  for (let i = 0; i < ads.length; i++) {
+    cumulative += weights[i];
+    if (random < cumulative) {
+      return ads[i];
+    }
+  }
+
+  // Fallback (should not reach here)
+  return ads[ads.length - 1];
 }
 
 // ============================================
@@ -608,6 +628,7 @@ export async function getAdForSlot(
   return {
     ...selectedAd,
     slotId: slot.id,
+    displayMode: (slot.displayMode as 'cover' | 'contain') ?? 'cover',
   };
 }
 
@@ -629,43 +650,158 @@ export async function getAdForPosition(
   return getAdForSlot(slot.id, context);
 }
 
+/**
+ * Multi-ad result for positions that display multiple ads
+ */
+export interface MultiAdResult {
+  ads: AdWithSlotInfo[];
+  slotId: string;
+  slotConfig: {
+    displayMode: 'cover' | 'contain';
+    maxVisible: number;
+    carouselInterval: number;
+    width: number;
+    height: number;
+  };
+}
+
+/**
+ * Get all ads for a slot position.
+ * Returns all eligible ads with slot configuration for multi-ad display.
+ * 
+ * The client should:
+ * - Display up to (maxVisible - 1) ads directly
+ * - Use carousel for remaining ads in the last slot
+ */
+export async function getAllAdsForPosition(
+  position: string,
+  context?: AdDeliveryContext
+): Promise<MultiAdResult | null> {
+  // All users see ads now (no VIP exemption)
+  if (context?.memberLevel && !shouldShowAds(context.memberLevel)) {
+    return null;
+  }
+
+  const slot = await adSlotRepository.findByPosition(position);
+  if (!slot || !slot.enabled) {
+    return null;
+  }
+
+  // Get all ads assigned to this slot
+  const assignments = await adSlotAssignmentRepository.getBySlot(slot.id);
+  if (assignments.length === 0) {
+    return null;
+  }
+
+  // Get active ads that match targeting criteria
+  const now = new Date();
+  const eligibleAds: AdWithSlotInfo[] = [];
+
+  for (const assignment of assignments) {
+    const ad = await adRepository.findById(assignment.adId);
+    if (ad && isAdActive(ad, now)) {
+      if (matchesTargeting(ad, context?.memberLevel, context?.groupId)) {
+        eligibleAds.push({
+          ...ad,
+          slotId: slot.id,
+          displayMode: (slot.displayMode as 'cover' | 'contain') ?? 'cover',
+        });
+      }
+    }
+  }
+
+  if (eligibleAds.length === 0) {
+    return null;
+  }
+
+  // Sort by priority (higher priority first)
+  eligibleAds.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+
+  return {
+    ads: eligibleAds,
+    slotId: slot.id,
+    slotConfig: {
+      displayMode: (slot.displayMode as 'cover' | 'contain') ?? 'cover',
+      maxVisible: slot.maxVisible ?? 3,
+      carouselInterval: slot.carouselInterval ?? 5,
+      width: slot.width,
+      height: slot.height,
+    },
+  };
+}
+
 // ============================================
 // Impression and Click Recording
 // Requirements: 3.2, 3.3
+// Anti-fraud: Deduplication within time windows
 // ============================================
 
 /**
- * Record an ad impression.
+ * Record an ad impression with anti-fraud deduplication.
+ * Skips recording if the same user has a recent impression.
  * 
  * Requirements: 3.2
+ * 
+ * @returns true if impression was recorded, false if deduplicated
  */
 export async function recordImpression(
   adId: string,
   slotId: string,
   userId?: string
-): Promise<void> {
+): Promise<boolean> {
+  // Check for recent impression from same user (5-minute window)
+  const hasRecent = await adImpressionRepository.hasRecentImpression(
+    adId,
+    slotId,
+    userId ?? null
+  );
+
+  if (hasRecent) {
+    // Skip duplicate impression
+    return false;
+  }
+
   await adImpressionRepository.create({
     id: generateId(),
     adId,
     slotId,
     userId: userId ?? null,
   });
+
+  return true;
 }
 
 /**
- * Record an ad click.
+ * Record an ad click with anti-fraud deduplication.
+ * Skips recording if the same user has a recent click.
  * 
  * Requirements: 3.3
+ * 
+ * @returns true if click was recorded, false if deduplicated
  */
 export async function recordClick(
   adId: string,
   slotId: string,
   userId?: string
-): Promise<void> {
+): Promise<boolean> {
+  // Check for recent click from same user (1-minute window)
+  const hasRecent = await adClickRepository.hasRecentClick(
+    adId,
+    slotId,
+    userId ?? null
+  );
+
+  if (hasRecent) {
+    // Skip duplicate click
+    return false;
+  }
+
   await adClickRepository.create({
     id: generateId(),
     adId,
     slotId,
     userId: userId ?? null,
   });
+
+  return true;
 }

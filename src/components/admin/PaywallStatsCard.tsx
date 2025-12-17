@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-interface PaywallStats {
+export interface PaywallStats {
   totalUnlocks: number;
   totalRevenue: number;
 }

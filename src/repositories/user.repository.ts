@@ -479,7 +479,7 @@ export class UserRepository extends BaseRepository {
         .groupBy(sql`DATE(${users.createdAt})`)
         .orderBy(sql`DATE(${users.createdAt})`);
 
-      return result.map(row => ({
+      return result.map((row: { date: string; count: number }) => ({
         date: String(row.date),
         count: Number(row.count),
       }));

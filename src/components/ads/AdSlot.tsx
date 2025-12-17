@@ -6,6 +6,7 @@ import { AdBanner, AdData } from './AdBanner';
 interface AdSlotResponse {
   ad: AdData | null;
   slotId: string | null;
+  displayMode?: 'cover' | 'contain';
 }
 
 interface AdSlotProps {
@@ -36,6 +37,7 @@ export const AdSlot = memo(function AdSlot({
 }: AdSlotProps) {
   const [ad, setAd] = useState<AdData | null>(null);
   const [slotId, setSlotId] = useState<string | null>(null);
+  const [displayMode, setDisplayMode] = useState<'cover' | 'contain'>('cover');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [containerWidth, setContainerWidth] = useState<number>(width);
@@ -69,8 +71,8 @@ export const AdSlot = memo(function AdSlot({
         setError(false);
 
         // Get auth token if available
-        const token = typeof window !== 'undefined' 
-          ? localStorage.getItem('accessToken') 
+        const token = typeof window !== 'undefined'
+          ? localStorage.getItem('accessToken')
           : null;
 
         const headers: HeadersInit = {};
@@ -92,11 +94,12 @@ export const AdSlot = memo(function AdSlot({
         }
 
         const data: AdSlotResponse = await response.json();
-        
+
         if (cancelled) return;
 
         setAd(data.ad);
         setSlotId(data.slotId);
+        setDisplayMode(data.displayMode ?? 'cover');
       } catch {
         if (cancelled) return;
         // Graceful degradation - hide slot on error (Requirements: 3.4)
@@ -121,10 +124,10 @@ export const AdSlot = memo(function AdSlot({
   if (loading) {
     // Show a subtle placeholder during loading to prevent layout shift
     return (
-      <div 
+      <div
         className={`bg-surface-secondary/30 rounded mx-auto ${className}`}
-        style={{ 
-          width: responsive ? containerWidth : width, 
+        style={{
+          width: responsive ? containerWidth : width,
           height: responsive ? responsiveHeight : height,
           maxWidth: '100%',
         }}
@@ -145,6 +148,7 @@ export const AdSlot = memo(function AdSlot({
         slotId={slotId}
         width={responsive ? containerWidth : width}
         height={responsive ? responsiveHeight : height}
+        displayMode={displayMode}
         responsive={responsive}
       />
     </div>

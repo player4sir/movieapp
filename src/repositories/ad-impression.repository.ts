@@ -66,7 +66,7 @@ export class AdImpressionRepository extends BaseRepository {
   async countByAd(adId: string, dateRange?: DateRange): Promise<number> {
     try {
       const conditions = [eq(adImpressions.adId, adId)];
-      
+
       if (dateRange) {
         conditions.push(gte(adImpressions.createdAt, dateRange.startDate));
         conditions.push(lte(adImpressions.createdAt, dateRange.endDate));
@@ -76,7 +76,7 @@ export class AdImpressionRepository extends BaseRepository {
         .select({ count: count() })
         .from(adImpressions)
         .where(and(...conditions));
-      
+
       return result[0]?.count ?? 0;
     } catch (error) {
       throw new RepositoryError('Failed to count impressions by ad', 'FIND_ERROR', error);
@@ -91,7 +91,7 @@ export class AdImpressionRepository extends BaseRepository {
   async countBySlot(slotId: string, dateRange?: DateRange): Promise<number> {
     try {
       const conditions = [eq(adImpressions.slotId, slotId)];
-      
+
       if (dateRange) {
         conditions.push(gte(adImpressions.createdAt, dateRange.startDate));
         conditions.push(lte(adImpressions.createdAt, dateRange.endDate));
@@ -101,7 +101,7 @@ export class AdImpressionRepository extends BaseRepository {
         .select({ count: count() })
         .from(adImpressions)
         .where(and(...conditions));
-      
+
       return result[0]?.count ?? 0;
     } catch (error) {
       throw new RepositoryError('Failed to count impressions by slot', 'FIND_ERROR', error);
@@ -122,7 +122,7 @@ export class AdImpressionRepository extends BaseRepository {
           gte(adImpressions.createdAt, dateRange.startDate),
           lte(adImpressions.createdAt, dateRange.endDate)
         ));
-      
+
       return result[0]?.count ?? 0;
     } catch (error) {
       throw new RepositoryError('Failed to count impressions by date range', 'FIND_ERROR', error);
@@ -136,7 +136,7 @@ export class AdImpressionRepository extends BaseRepository {
   async getCountsByAd(dateRange?: DateRange): Promise<ImpressionCountByAd[]> {
     try {
       const conditions = [];
-      
+
       if (dateRange) {
         conditions.push(gte(adImpressions.createdAt, dateRange.startDate));
         conditions.push(lte(adImpressions.createdAt, dateRange.endDate));
@@ -152,7 +152,7 @@ export class AdImpressionRepository extends BaseRepository {
         .from(adImpressions)
         .where(whereClause)
         .groupBy(adImpressions.adId);
-      
+
       return result.map((r: { adId: string; count: number }) => ({
         adId: r.adId,
         count: r.count,
@@ -176,4 +176,53 @@ export class AdImpressionRepository extends BaseRepository {
       throw new RepositoryError('Failed to find impressions by ad', 'FIND_ERROR', error);
     }
   }
+
+  /**
+   * Check if there's a recent impression from the same user for the same ad.
+   * Used for anti-fraud deduplication - prevents counting multiple impressions
+   * from the same user within a short time window.
+   * 
+   * @param adId - The ad ID
+   * @param slotId - The slot ID
+   * @param userId - The user ID (null for anonymous)
+   * @param windowMinutes - Time window in minutes (default: 5)
+   * @returns true if a recent impression exists
+   */
+  async hasRecentImpression(
+    adId: string,
+    slotId: string,
+    userId: string | null,
+    windowMinutes: number = 5
+  ): Promise<boolean> {
+    try {
+      const windowStart = new Date(Date.now() - windowMinutes * 60 * 1000);
+
+      const conditions = [
+        eq(adImpressions.adId, adId),
+        eq(adImpressions.slotId, slotId),
+        gte(adImpressions.createdAt, windowStart),
+      ];
+
+      // For authenticated users, check by userId
+      // For anonymous users, we can't deduplicate server-side
+      if (userId) {
+        conditions.push(eq(adImpressions.userId, userId));
+      } else {
+        // For anonymous users, skip deduplication (rely on client-side)
+        return false;
+      }
+
+      const result = await this.db
+        .select({ count: count() })
+        .from(adImpressions)
+        .where(and(...conditions));
+
+      return (result[0]?.count ?? 0) > 0;
+    } catch (error) {
+      // Don't block impression recording on dedup errors
+      console.error('Failed to check recent impression:', error);
+      return false;
+    }
+  }
 }
+

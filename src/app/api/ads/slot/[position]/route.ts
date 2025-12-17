@@ -42,14 +42,14 @@ export async function GET(
   try {
     // Try to authenticate user (optional - anonymous users can also see ads)
     const authResult = await authenticateRequest(request);
-    
+
     // Build delivery context
     const context = authResult.success && authResult.user
       ? {
-          userId: authResult.user.id,
-          memberLevel: authResult.user.memberLevel,
-          // groupId could be added if user has group association
-        }
+        userId: authResult.user.id,
+        memberLevel: authResult.user.memberLevel,
+        // groupId could be added if user has group association
+      }
       : undefined;
 
     // Get ad for the position
@@ -76,12 +76,13 @@ export async function GET(
           targetUrl: ad.targetUrl,
         },
         slotId: ad.slotId,
+        displayMode: ad.displayMode ?? 'cover',
       },
       { status: 200 }
     );
   } catch (error) {
     console.error('Get ad for slot error:', error);
-    
+
     // Graceful degradation - return empty response instead of error
     // This ensures ads don't break the page layout
     return NextResponse.json(

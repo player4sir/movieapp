@@ -33,10 +33,10 @@ interface SplashAdProps {
  * - Skip button (appears after delay)
  * - Auto-close after duration
  * - Click tracking
- * - SVIP users bypass (handled by API)
+ * - All users see ads (no VIP exemption)
  */
-export function SplashAd({ 
-  duration = 5, 
+export function SplashAd({
+  duration = 5,
   onClose,
   skipDelay = 2,
 }: SplashAdProps) {
@@ -46,16 +46,30 @@ export function SplashAd({
   const [countdown, setCountdown] = useState(duration);
   const [canSkip, setCanSkip] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [shouldClose, setShouldClose] = useState(false); // New: track when to close
+
   const impressionRecorded = useRef(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const skipTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Store onClose in ref to avoid including in dependency arrays
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  // Handle deferred close via state change
+  useEffect(() => {
+    if (shouldClose) {
+      onCloseRef.current?.();
+    }
+  }, [shouldClose]);
 
   // Fetch splash ad
   useEffect(() => {
+    let cancelled = false;
+
     async function fetchAd() {
       try {
-        const token = typeof window !== 'undefined' 
-          ? localStorage.getItem('accessToken') 
+        const token = typeof window !== 'undefined'
+          ? localStorage.getItem('accessToken')
           : null;
 
         const headers: HeadersInit = {};
@@ -64,31 +78,42 @@ export function SplashAd({
         }
 
         const response = await fetch('/api/ads/slot/splash', { headers });
-        
+
+        if (cancelled) return;
+
         if (!response.ok) {
-          onClose?.();
+          setShouldClose(true);
           return;
         }
 
         const data: SplashAdResponse = await response.json();
-        
+
+        if (cancelled) return;
+
         if (!data.ad || !data.slotId) {
-          // No ad available, close immediately
-          onClose?.();
+          setShouldClose(true);
           return;
         }
 
         setAd(data.ad);
         setSlotId(data.slotId);
       } catch {
-        onClose?.();
+        if (!cancelled) {
+          setShouldClose(true);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     }
 
     fetchAd();
-  }, [onClose]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, []); // No dependencies - run once on mount
 
   // Record impression when ad is shown
   useEffect(() => {
@@ -99,7 +124,7 @@ export function SplashAd({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ adId: ad.id, slotId }),
-    }).catch(() => {});
+    }).catch(() => { });
   }, [ad, slotId, imageLoaded]);
 
   // Start countdown when image is loaded
@@ -111,7 +136,8 @@ export function SplashAd({
       setCountdown(prev => {
         if (prev <= 1) {
           clearInterval(timerRef.current!);
-          onClose?.();
+          // Defer close to avoid updating state during render
+          setShouldClose(true);
           return 0;
         }
         return prev - 1;
@@ -127,7 +153,7 @@ export function SplashAd({
       if (timerRef.current) clearInterval(timerRef.current);
       if (skipTimerRef.current) clearTimeout(skipTimerRef.current);
     };
-  }, [imageLoaded, ad, onClose, skipDelay]);
+  }, [imageLoaded, ad, skipDelay]); // Remove onClose from deps
 
   // Handle ad click
   const handleClick = useCallback(async () => {
@@ -140,7 +166,7 @@ export function SplashAd({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ adId: ad.id, slotId }),
       });
-    } catch {}
+    } catch { }
 
     // Open target URL
     window.open(ad.targetUrl, '_blank', 'noopener,noreferrer');
@@ -150,10 +176,15 @@ export function SplashAd({
   const handleSkip = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
     if (skipTimerRef.current) clearTimeout(skipTimerRef.current);
-    onClose?.();
-  }, [onClose]);
+    setShouldClose(true);
+  }, []);
 
-  // Loading or no ad
+  // Handle image load error
+  const handleImageError = useCallback(() => {
+    setShouldClose(true);
+  }, []);
+
+  // Loading state
   if (loading) {
     return (
       <div className="fixed inset-0 z-[9999] bg-black flex items-center justify-center">
@@ -162,12 +193,13 @@ export function SplashAd({
     );
   }
 
+  // No ad available
   if (!ad) return null;
 
   return (
     <div className="fixed inset-0 z-[9999] bg-black">
       {/* Ad Image */}
-      <div 
+      <div
         className="w-full h-full cursor-pointer"
         onClick={handleClick}
       >
@@ -175,13 +207,12 @@ export function SplashAd({
         <img
           src={ad.imageUrl}
           alt={ad.title}
-          className={`w-full h-full object-cover transition-opacity duration-300 ${
-            imageLoaded ? 'opacity-100' : 'opacity-0'
-          }`}
+          className={`w-full h-full object-contain transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
           onLoad={() => setImageLoaded(true)}
-          onError={() => onClose?.()}
+          onError={handleImageError}
         />
-        
+
         {/* Loading placeholder */}
         {!imageLoaded && (
           <div className="absolute inset-0 flex items-center justify-center">
@@ -194,11 +225,10 @@ export function SplashAd({
       {imageLoaded && (
         <button
           onClick={canSkip ? handleSkip : undefined}
-          className={`absolute top-12 right-4 px-4 py-2 rounded-full text-sm font-medium transition-all ${
-            canSkip 
-              ? 'bg-white/20 text-white backdrop-blur-sm active:bg-white/30' 
-              : 'bg-black/40 text-white/80'
-          }`}
+          className={`absolute top-12 right-4 px-4 py-2 rounded-full text-sm font-medium transition-all ${canSkip
+            ? 'bg-white/20 text-white backdrop-blur-sm active:bg-white/30'
+            : 'bg-black/40 text-white/80'
+            }`}
         >
           {canSkip ? '跳过' : `${countdown}s`}
         </button>
@@ -215,3 +245,4 @@ export function SplashAd({
 }
 
 export default SplashAd;
+

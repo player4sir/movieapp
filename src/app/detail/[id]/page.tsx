@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { useVODDetail, useContentAccess, useAuth, AccessResult } from '@/hooks';
 import { PaywallBadge, EpisodeItem } from '@/components/paywall';
-import { AdSlot } from '@/components/ads';
+import { AdSlotGroup } from '@/components/ads';
 
 type SourceCategory = 'normal' | 'adult';
 
@@ -326,11 +326,9 @@ function DetailPageContent() {
 
         {/* Ad Slot - detail_middle */}
         <div className="mb-6">
-          <AdSlot
+          <AdSlotGroup
             position="detail_middle"
-            width={728}
-            height={90}
-            className="w-full max-w-full rounded-xl overflow-hidden shadow-sm"
+            className="w-full max-w-full"
           />
         </div>
 

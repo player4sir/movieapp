@@ -7,8 +7,7 @@ import { AdFormModal, type Ad, type AdFormData } from '@/components/admin/AdForm
 
 /**
  * Admin Ad Management Page
- * List ads with status, impressions, clicks
- * Add/Edit/Delete ad functionality
+ * Enhanced with batch operations, preview, and inline stats
  * 
  * Requirements: 1.1, 1.2, 1.3, 1.4
  */
@@ -20,6 +19,9 @@ export default function AdminAdsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingAd, setEditingAd] = useState<Ad | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [previewAd, setPreviewAd] = useState<Ad | null>(null);
+  const [batchProcessing, setBatchProcessing] = useState(false);
   const hasFetched = useRef(false);
 
   const fetchAds = useCallback(async () => {
@@ -51,11 +53,83 @@ export default function AdminAdsPage() {
     fetchAds();
   }, [fetchAds]);
 
+  // Selection handlers
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === ads.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(ads.map(ad => ad.id)));
+    }
+  };
+
+  // Batch operations
+  const handleBatchEnable = async (enable: boolean) => {
+    const token = getAccessToken();
+    if (!token || selectedIds.size === 0) return;
+
+    setBatchProcessing(true);
+    try {
+      const promises = Array.from(selectedIds).map(id =>
+        fetch(`/api/admin/ads/${id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ enabled: enable }),
+        })
+      );
+      await Promise.all(promises);
+      setSelectedIds(new Set());
+      hasFetched.current = false;
+      setLoading(true);
+      fetchAds();
+    } catch {
+      setError('批量操作失败');
+    } finally {
+      setBatchProcessing(false);
+    }
+  };
+
+  const handleBatchDelete = async () => {
+    const token = getAccessToken();
+    if (!token || selectedIds.size === 0) return;
+
+    if (!confirm(`确定要删除选中的 ${selectedIds.size} 个广告吗？`)) return;
+
+    setBatchProcessing(true);
+    try {
+      const promises = Array.from(selectedIds).map(id =>
+        fetch(`/api/admin/ads/${id}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        })
+      );
+      await Promise.all(promises);
+      setSelectedIds(new Set());
+      hasFetched.current = false;
+      setLoading(true);
+      fetchAds();
+    } catch {
+      setError('批量删除失败');
+    } finally {
+      setBatchProcessing(false);
+    }
+  };
+
   const handleCreate = () => {
     setEditingAd(null);
     setModalOpen(true);
   };
-
 
   const handleEdit = (ad: Ad) => {
     setEditingAd(ad);
@@ -133,31 +207,78 @@ export default function AdminAdsPage() {
   };
 
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleString('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return new Date(dateStr).toLocaleDateString('zh-CN');
+  };
+
+  // Calculate summary stats
+  const stats = {
+    total: ads.length,
+    active: ads.filter(ad => !ad.deleted && ad.enabled && new Date() >= new Date(ad.startDate) && new Date() <= new Date(ad.endDate)).length,
+    impressions: ads.reduce((sum, ad) => sum + ad.impressions, 0),
+    clicks: ads.reduce((sum, ad) => sum + ad.clicks, 0),
   };
 
   return (
     <div className="p-4 lg:p-6">
+      {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-semibold">广告管理</h1>
         <div className="flex items-center gap-2">
-          <Link href="/console-x9k2m/settings/ads/slots" className="btn-secondary px-4 py-2 text-sm">
-            广告位管理
+          <Link href="/console-x9k2m/settings/ads/slots" className="btn-secondary px-3 py-2 text-sm">
+            广告位
           </Link>
-          <Link href="/console-x9k2m/settings/ads/stats" className="btn-secondary px-4 py-2 text-sm">
-            统计数据
+          <Link href="/console-x9k2m/settings/ads/stats" className="btn-secondary px-3 py-2 text-sm">
+            统计
           </Link>
           <button onClick={handleCreate} className="btn-primary px-4 py-2 text-sm">
-            添加广告
+            添加
           </button>
         </div>
       </div>
+
+      {/* Stats Bar */}
+      {!loading && ads.length > 0 && (
+        <div className="flex gap-4 mb-4 text-sm">
+          <span className="px-3 py-1 bg-surface rounded">总计: <strong>{stats.total}</strong></span>
+          <span className="px-3 py-1 bg-green-500/10 text-green-500 rounded">投放中: <strong>{stats.active}</strong></span>
+          <span className="px-3 py-1 bg-surface rounded">曝光: <strong>{stats.impressions.toLocaleString()}</strong></span>
+          <span className="px-3 py-1 bg-surface rounded">点击: <strong>{stats.clicks.toLocaleString()}</strong></span>
+        </div>
+      )}
+
+      {/* Batch Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 mb-4 p-3 bg-primary/10 rounded-lg">
+          <span className="text-sm">已选 <strong>{selectedIds.size}</strong> 项</span>
+          <button
+            onClick={() => handleBatchEnable(true)}
+            disabled={batchProcessing}
+            className="btn-secondary px-3 py-1.5 text-xs"
+          >
+            启用
+          </button>
+          <button
+            onClick={() => handleBatchEnable(false)}
+            disabled={batchProcessing}
+            className="btn-secondary px-3 py-1.5 text-xs"
+          >
+            禁用
+          </button>
+          <button
+            onClick={handleBatchDelete}
+            disabled={batchProcessing}
+            className="btn-secondary px-3 py-1.5 text-xs text-red-500 hover:bg-red-500/10"
+          >
+            删除
+          </button>
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="ml-auto text-xs text-foreground/50 hover:text-foreground"
+          >
+            取消选择
+          </button>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center h-64">
@@ -176,26 +297,42 @@ export default function AdminAdsPage() {
           </button>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
+          {/* Select All */}
+          <div className="flex items-center gap-2 px-2 py-1">
+            <input
+              type="checkbox"
+              checked={selectedIds.size === ads.length && ads.length > 0}
+              onChange={toggleSelectAll}
+              className="w-4 h-4 rounded border-border accent-primary"
+            />
+            <span className="text-xs text-foreground/50">全选</span>
+          </div>
+
           {ads.map(ad => {
             const status = getAdStatus(ad);
             return (
-              <div key={ad.id} className="bg-surface rounded-lg p-4">
-                <div className="flex items-start gap-4">
-                  {/* Ad Image Preview */}
-                  <div className="w-24 h-16 bg-surface-secondary rounded overflow-hidden flex-shrink-0">
+              <div key={ad.id} className={`bg-surface rounded-lg p-3 ${selectedIds.has(ad.id) ? 'ring-2 ring-primary' : ''}`}>
+                <div className="flex items-center gap-3">
+                  {/* Checkbox */}
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(ad.id)}
+                    onChange={() => toggleSelect(ad.id)}
+                    className="w-4 h-4 rounded border-border accent-primary flex-shrink-0"
+                  />
+
+                  {/* Ad Image - Clickable for Preview */}
+                  <div
+                    className="w-20 h-12 bg-surface-secondary rounded overflow-hidden flex-shrink-0 cursor-pointer hover:opacity-80"
+                    onClick={() => setPreviewAd(ad)}
+                    title="点击预览"
+                  >
                     {ad.imageUrl ? (
-                      <img
-                        src={ad.imageUrl}
-                        alt={ad.title}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
-                        }}
-                      />
+                      <img src={ad.imageUrl} alt={ad.title} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-foreground/30">
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
                       </div>
@@ -204,29 +341,24 @@ export default function AdminAdsPage() {
 
                   {/* Ad Info */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-medium truncate">{ad.title}</h3>
-                      <span className={`text-xs px-2 py-0.5 rounded ${status.color}`}>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-medium text-sm truncate">{ad.title}</h3>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${status.color}`}>
                         {status.label}
                       </span>
                     </div>
-                    <p className="text-xs text-foreground/50 truncate mb-2">{ad.targetUrl}</p>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-foreground/60">
-                      <span>展示: {ad.impressions.toLocaleString()}</span>
-                      <span>点击: {ad.clicks.toLocaleString()}</span>
-                      <span>CTR: {ad.ctr.toFixed(2)}%</span>
-                      <span>优先级: {ad.priority}</span>
-                    </div>
-                    <div className="text-xs text-foreground/40 mt-1">
-                      {formatDate(ad.startDate)} - {formatDate(ad.endDate)}
+                    <div className="flex gap-3 text-xs text-foreground/50 mt-0.5">
+                      <span>{formatDate(ad.startDate)} - {formatDate(ad.endDate)}</span>
+                      <span>展示 {ad.impressions}</span>
+                      <span>点击 {ad.clicks}</span>
                     </div>
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="flex items-center gap-1 flex-shrink-0">
                     <button
                       onClick={() => handleEdit(ad)}
-                      className="p-2 rounded-lg hover:bg-surface-secondary text-foreground/60 hover:text-foreground"
+                      className="p-1.5 rounded hover:bg-surface-secondary text-foreground/60 hover:text-foreground"
                       title="编辑"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -235,7 +367,7 @@ export default function AdminAdsPage() {
                     </button>
                     <button
                       onClick={() => setDeleteConfirm(ad.id)}
-                      className="p-2 rounded-lg hover:bg-red-500/10 text-foreground/60 hover:text-red-500"
+                      className="p-1.5 rounded hover:bg-red-500/10 text-foreground/60 hover:text-red-500"
                       title="删除"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -257,6 +389,34 @@ export default function AdminAdsPage() {
         onClose={() => setModalOpen(false)}
         onSave={handleSave}
       />
+
+      {/* Preview Modal */}
+      {previewAd && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setPreviewAd(null)}>
+          <div className="relative max-w-2xl w-full" onClick={e => e.stopPropagation()}>
+            <button
+              onClick={() => setPreviewAd(null)}
+              className="absolute -top-10 right-0 text-white/80 hover:text-white"
+            >
+              ✕ 关闭
+            </button>
+            <div className="bg-surface rounded-lg overflow-hidden">
+              {previewAd.imageUrl && (
+                <img src={previewAd.imageUrl} alt={previewAd.title} className="w-full" />
+              )}
+              <div className="p-4">
+                <h3 className="font-medium mb-1">{previewAd.title}</h3>
+                <p className="text-sm text-foreground/50 truncate">{previewAd.targetUrl}</p>
+                <div className="flex gap-4 mt-2 text-xs text-foreground/60">
+                  <span>展示: {previewAd.impressions.toLocaleString()}</span>
+                  <span>点击: {previewAd.clicks.toLocaleString()}</span>
+                  <span>CTR: {previewAd.ctr.toFixed(2)}%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (

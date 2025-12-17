@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, Loader2, RefreshCw, Film } from 'lucide-react';
 import { SliverHeader, BottomNav, PullToRefresh, VODGrid, CategoryMenu, AgeVerificationGate, Sidebar } from '@/components';
-import { AdSlot } from '@/components/ads';
+import { AdSlotGroup } from '@/components/ads';
 import { useVODList, useCategories, useInfiniteScroll, useAgeVerification } from '@/hooks';
 
 export default function AdultPage() {
@@ -113,11 +113,9 @@ export default function AdultPage() {
 
             {/* Ad Slot - adult_top position (Requirements: 3.1) */}
             <div className="px-4 py-3">
-              <AdSlot
+              <AdSlotGroup
                 position="adult_top"
-                width={728}
-                height={90}
-                className="w-full max-w-full rounded-xl overflow-hidden shadow-sm"
+                className="w-full max-w-full"
               />
             </div>
 

@@ -45,6 +45,8 @@ interface VideoPlayerProps {
   onSourceSwitch?: () => void;
   useIframe?: boolean;
   token?: string;
+  /** Maximum allowed seek time for preview mode (in seconds). If set, user cannot seek beyond this time. */
+  maxSeekTime?: number;
 }
 
 // 错误类型
@@ -159,12 +161,13 @@ function GestureHint({ type, value }: { type: 'seek' | 'speed'; value: string })
 
 // ArtPlayer组件
 const ArtVideoPlayer = forwardRef<VideoPlayerRef, Omit<VideoPlayerProps, 'useIframe'>>(
-  function ArtVideoPlayer({ src, poster, initialPosition = 0, onTimeUpdate, onEnded, onError, onSourceSwitch, token }, ref) {
+  function ArtVideoPlayer({ src, poster, initialPosition = 0, onTimeUpdate, onEnded, onError, onSourceSwitch, token, maxSeekTime }, ref) {
     const containerRef = useRef<HTMLDivElement>(null);
     const artRef = useRef<Artplayer | null>(null);
     const hlsRef = useRef<Hls | null>(null);
     const retryCountRef = useRef(0);
     const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+    const maxSeekTimeRef = useRef(maxSeekTime);
 
     // Event handler refs to prevent re-initialization on prop change
     const onTimeUpdateRef = useRef(onTimeUpdate);
@@ -177,7 +180,8 @@ const ArtVideoPlayer = forwardRef<VideoPlayerRef, Omit<VideoPlayerProps, 'useIfr
       onEndedRef.current = onEnded;
       onErrorRef.current = onError;
       onSourceSwitchRef.current = onSourceSwitch;
-    }, [onTimeUpdate, onEnded, onError, onSourceSwitch]);
+      maxSeekTimeRef.current = maxSeekTime;
+    }, [onTimeUpdate, onEnded, onError, onSourceSwitch, maxSeekTime]);
 
     // 状态
     const [loading, setLoading] = useState(true);
@@ -583,20 +587,25 @@ const ArtVideoPlayer = forwardRef<VideoPlayerRef, Omit<VideoPlayerProps, 'useIfr
         handleError('unknown');
       });
 
+      // Seek restriction for preview mode - prevent seeking past allowed time
+      art.on('video:seeking', () => {
+        const maxTime = maxSeekTimeRef.current;
+        if (maxTime && maxTime > 0 && art.currentTime > maxTime) {
+          art.currentTime = Math.max(0, maxTime - 1);
+        }
+      });
+
       // 播放时请求屏幕唤醒锁
       art.on('video:play', () => {
-        console.log('[VideoPlayer] Event: play');
         requestWakeLock();
       });
 
       // 暂停时释放唤醒锁
       art.on('video:pause', () => {
-        console.log('[VideoPlayer] Event: pause');
         releaseWakeLock();
       });
 
       art.on('ready', () => {
-        console.log('[VideoPlayer] Event: ready');
         setLoading(false);
         if (initialPosition > 0) {
           art.currentTime = initialPosition;
@@ -610,10 +619,8 @@ const ArtVideoPlayer = forwardRef<VideoPlayerRef, Omit<VideoPlayerProps, 'useIfr
       // ... (omitted)
 
       artRef.current = art;
-      console.log('[VideoPlayer] Mounted');
 
       return () => {
-        console.log('[VideoPlayer] Unmounted');
         if (longPressTimerRef.current) {
           clearTimeout(longPressTimerRef.current);
         }

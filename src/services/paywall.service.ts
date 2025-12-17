@@ -91,7 +91,7 @@ const DEFAULT_CONFIG = {
   vipDiscount: 0.5, // 50% discount for VIP on adult content
   previewPercentage: 0.25, // 25% of video duration
   previewMinSeconds: 60, // Minimum 1 minute
-  previewMaxSeconds: 600, // Maximum 10 minutes
+  previewMaxSeconds: 360, // Maximum 6 minutes
 };
 
 // ============================================

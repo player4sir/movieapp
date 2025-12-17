@@ -84,7 +84,7 @@ export default function AdminAdStatsPage() {
         if (slotsRes.ok) {
           const slotsData = await slotsRes.json();
           const slots = slotsData.data || [];
-          
+
           // Fetch stats for each slot
           const statsPromises = slots.map(async (slot: { id: string }) => {
             const statsRes = await fetch(`/api/admin/ads/slots/${slot.id}/stats${queryString}`, {
@@ -150,17 +150,15 @@ export default function AdminAdStatsPage() {
       <div className="flex gap-2 mb-4">
         <button
           onClick={() => handleViewModeChange('ads')}
-          className={`px-4 py-2 text-sm rounded-lg transition-colors ${
-            viewMode === 'ads' ? 'bg-primary text-white' : 'bg-surface hover:bg-surface-secondary'
-          }`}
+          className={`px-4 py-2 text-sm rounded-lg transition-colors ${viewMode === 'ads' ? 'bg-primary text-white' : 'bg-surface hover:bg-surface-secondary'
+            }`}
         >
           按广告统计
         </button>
         <button
           onClick={() => handleViewModeChange('slots')}
-          className={`px-4 py-2 text-sm rounded-lg transition-colors ${
-            viewMode === 'slots' ? 'bg-primary text-white' : 'bg-surface hover:bg-surface-secondary'
-          }`}
+          className={`px-4 py-2 text-sm rounded-lg transition-colors ${viewMode === 'slots' ? 'bg-primary text-white' : 'bg-surface hover:bg-surface-secondary'
+            }`}
         >
           按广告位统计
         </button>
@@ -229,6 +227,9 @@ function AdsStatsView({ stats, formatNumber, formatCtr }: AdsStatsViewProps) {
     );
   }
 
+  // Calculate max impressions for chart scaling
+  const maxImpressions = Math.max(...stats.ads.map(ad => ad.impressions), 1);
+
   return (
     <div className="space-y-4">
       {/* Summary Cards */}
@@ -246,6 +247,36 @@ function AdsStatsView({ stats, formatNumber, formatCtr }: AdsStatsViewProps) {
           <p className="text-2xl font-bold">{formatCtr(stats.averageCtr)}</p>
         </div>
       </div>
+
+      {/* Simple Bar Chart */}
+      {stats.ads.length > 0 && (
+        <div className="bg-surface rounded-lg p-4">
+          <h3 className="text-sm font-medium mb-3">广告表现对比</h3>
+          <div className="space-y-2">
+            {stats.ads.slice(0, 5).map(ad => {
+              const impressionPercent = (ad.impressions / maxImpressions) * 100;
+              return (
+                <div key={ad.adId} className="flex items-center gap-2">
+                  <span className="w-24 text-xs truncate text-foreground/60">{ad.adTitle}</span>
+                  <div className="flex-1 h-6 bg-surface-secondary rounded overflow-hidden relative">
+                    <div
+                      className="h-full bg-primary/80 transition-all duration-500"
+                      style={{ width: `${impressionPercent}%` }}
+                    />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-medium">
+                      {formatNumber(ad.impressions)}
+                    </span>
+                  </div>
+                  <span className="w-14 text-xs text-right text-green-500">{formatCtr(ad.ctr)}</span>
+                </div>
+              );
+            })}
+          </div>
+          {stats.ads.length > 5 && (
+            <p className="text-xs text-foreground/40 mt-2 text-center">显示前 5 条</p>
+          )}
+        </div>
+      )}
 
       {/* Ads Table */}
       {stats.ads.length > 0 ? (
@@ -326,7 +357,7 @@ function SlotsStatsView({ stats, formatNumber, formatCtr }: SlotsStatsViewProps)
       <div className="space-y-3">
         {stats.map(slot => (
           <div key={slot.slotId} className="bg-surface rounded-lg overflow-hidden">
-            <div 
+            <div
               className="p-4 cursor-pointer hover:bg-surface-secondary/50 transition-colors"
               onClick={() => setExpandedSlot(expandedSlot === slot.slotId ? null : slot.slotId)}
             >
@@ -348,10 +379,10 @@ function SlotsStatsView({ stats, formatNumber, formatCtr }: SlotsStatsViewProps)
                     <p className="text-foreground/60 text-xs">CTR</p>
                     <p className="font-medium">{formatCtr(slot.averageCtr)}</p>
                   </div>
-                  <svg 
-                    className={`w-5 h-5 text-foreground/40 transition-transform ${expandedSlot === slot.slotId ? 'rotate-180' : ''}`} 
-                    fill="none" 
-                    stroke="currentColor" 
+                  <svg
+                    className={`w-5 h-5 text-foreground/40 transition-transform ${expandedSlot === slot.slotId ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
                     viewBox="0 0 24 24"
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -359,7 +390,7 @@ function SlotsStatsView({ stats, formatNumber, formatCtr }: SlotsStatsViewProps)
                 </div>
               </div>
             </div>
-            
+
             {/* Expanded Ad Stats */}
             {expandedSlot === slot.slotId && slot.adStats.length > 0 && (
               <div className="border-t border-surface-secondary">
@@ -385,7 +416,7 @@ function SlotsStatsView({ stats, formatNumber, formatCtr }: SlotsStatsViewProps)
                 </table>
               </div>
             )}
-            
+
             {expandedSlot === slot.slotId && slot.adStats.length === 0 && (
               <div className="border-t border-surface-secondary p-4 text-center text-foreground/50 text-sm">
                 该广告位暂无广告数据
