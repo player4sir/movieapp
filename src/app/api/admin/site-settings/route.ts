@@ -18,7 +18,8 @@ const DEFAULT_SETTINGS = {
     site_copyright: '© 2024 影视流媒体',
 };
 
-type SettingKey = keyof typeof DEFAULT_SETTINGS;
+// type SettingKey = keyof typeof DEFAULT_SETTINGS;
+type SettingKey = string;
 
 /**
  * GET /api/admin/site-settings
@@ -85,6 +86,12 @@ export async function PUT(request: NextRequest) {
         }
         if (site_copyright !== undefined) {
             updates.push({ key: 'site_copyright', value: site_copyright, description: '版权信息' });
+        }
+
+        // Add support for arbitrary keys or specifically faq_config
+        const { faq_config } = body;
+        if (faq_config !== undefined) {
+            updates.push({ key: 'faq_config', value: typeof faq_config === 'string' ? faq_config : JSON.stringify(faq_config), description: '问答配置' });
         }
 
         // Upsert each setting

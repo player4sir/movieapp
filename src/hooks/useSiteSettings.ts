@@ -7,6 +7,7 @@ interface SiteSettingsData {
     site_description: string;
     site_logo: string;
     site_copyright: string;
+    faq_config?: string;
 }
 
 const DEFAULT_SETTINGS: SiteSettingsData = {
@@ -19,7 +20,7 @@ const DEFAULT_SETTINGS: SiteSettingsData = {
 // Cache for site settings
 let cachedSettings: SiteSettingsData | null = null;
 let cacheTimestamp = 0;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const CACHE_DURATION = 1 * 60 * 1000; // 1 minute (reduced from 5 for faster updates)
 
 /**
  * Hook for fetching and caching site settings

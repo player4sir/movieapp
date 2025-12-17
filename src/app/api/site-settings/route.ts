@@ -29,10 +29,10 @@ export async function GET() {
             result[setting.key] = setting.value;
         }
 
-        // Cache for 5 minutes
+        // No cache to ensure immediate updates
         return NextResponse.json(result, {
             headers: {
-                'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+                'Cache-Control': 'no-store, max-age=0',
             },
         });
     } catch (error) {
