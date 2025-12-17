@@ -669,3 +669,30 @@ export type PaymentType = 'wechat' | 'alipay';
 
 // Member level enum values
 export type MemberLevel = 'free' | 'vip' | 'svip';
+
+// Export all tables as a collection for backup service
+export const allTables = {
+  users,
+  userGroups,
+  userSessions,
+  userCoinBalances,
+  userCheckins,
+  userRoleEnum,
+  favorites,
+  watchHistory,
+  videoSources,
+  siteSettings,
+  coinConfigs,
+  coinTransactions,
+  contentAccess,
+  membershipPlans,
+  membershipOrders,
+  membershipAdjustLogs,
+  coinOrders,
+  paymentQRCodes,
+  ads,
+  adSlots,
+  adSlotAssignments,
+  adImpressions,
+  adClicks,
+};

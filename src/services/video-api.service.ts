@@ -383,7 +383,7 @@ export class VideoAPIProxy {
           h: hours,
         }, 'detail'),
         {
-          validate: (data) => !!(data && data.list && data.list.length > 0)
+          validate: (data) => !!(data && Array.isArray(data.list))
         }
       );
     });
@@ -394,7 +394,7 @@ export class VideoAPIProxy {
         page: result.data.page,
         pageSize: parseInt(result.data.limit) || 20,
         total: result.data.total,
-        totalPages: result.data.pagecount,
+        totalPages: result.data.pagecount || Math.ceil(result.data.total / (parseInt(result.data.limit) || 20)) || 1,
       },
       isStale: result.isStale,
       cachedAt: result.cachedAt,
@@ -464,7 +464,7 @@ export class VideoAPIProxy {
           return url.toString();
         },
         {
-          validate: (data) => !!(data && data.list && data.list.length > 0)
+          validate: (data) => !!(data && Array.isArray(data.list))
         }
       );
     });
@@ -503,7 +503,7 @@ export class VideoAPIProxy {
           wd: trimmedKeyword,
         }, 'detail'),
         {
-          validate: (data) => !!(data && data.list && data.list.length > 0)
+          validate: (data) => !!(data && Array.isArray(data.list))
         }
       );
     });
@@ -514,7 +514,7 @@ export class VideoAPIProxy {
         page: result.data.page,
         pageSize: parseInt(result.data.limit) || 20,
         total: result.data.total,
-        totalPages: result.data.pagecount,
+        totalPages: result.data.pagecount || Math.ceil(result.data.total / (parseInt(result.data.limit) || 20)) || 1,
       },
       isStale: result.isStale,
       cachedAt: result.cachedAt,
