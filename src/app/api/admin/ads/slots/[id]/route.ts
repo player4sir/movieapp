@@ -131,6 +131,10 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       height: body.height !== undefined ? Math.floor(body.height) : undefined,
       rotationStrategy: body.rotationStrategy,
       enabled: body.enabled,
+      // Multi-ad display settings
+      displayMode: body.displayMode,
+      maxVisible: body.maxVisible !== undefined ? Math.floor(body.maxVisible) : undefined,
+      carouselInterval: body.carouselInterval !== undefined ? Math.floor(body.carouselInterval) : undefined,
     });
 
     return NextResponse.json({ data: slot });

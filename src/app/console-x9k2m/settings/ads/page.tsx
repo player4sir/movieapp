@@ -93,6 +93,8 @@ export default function AdminAdsPage() {
       hasFetched.current = false;
       setLoading(true);
       fetchAds();
+      // Invalidate ad cache when ads are batch enabled/disabled
+      localStorage.setItem('ad_config_version', Date.now().toString());
     } catch {
       setError('批量操作失败');
     } finally {
@@ -119,6 +121,8 @@ export default function AdminAdsPage() {
       hasFetched.current = false;
       setLoading(true);
       fetchAds();
+      // Invalidate ad cache when ads are batch deleted
+      localStorage.setItem('ad_config_version', Date.now().toString());
     } catch {
       setError('批量删除失败');
     } finally {
@@ -167,6 +171,8 @@ export default function AdminAdsPage() {
     hasFetched.current = false;
     setLoading(true);
     fetchAds();
+    // Invalidate ad cache when ad is created/updated
+    localStorage.setItem('ad_config_version', Date.now().toString());
   };
 
   const handleDelete = async (id: string) => {
@@ -181,6 +187,8 @@ export default function AdminAdsPage() {
 
       if (res.ok) {
         setAds(prev => prev.filter(ad => ad.id !== id));
+        // Invalidate ad cache when ad is deleted
+        localStorage.setItem('ad_config_version', Date.now().toString());
       } else {
         const err = (await res.json()) as { message?: string };
         setError(err.message || '删除失败');

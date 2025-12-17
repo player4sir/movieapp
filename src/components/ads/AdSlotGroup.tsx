@@ -73,7 +73,7 @@ export const AdSlotGroup = memo(function AdSlotGroup({
     useEffect(() => {
         let cancelled = false;
         const cacheKey = `ad_slot_${position}`;
-        const cacheTTL = 5 * 60 * 1000; // 5 minutes cache
+        const cacheTTL = 5 * 60 * 1000; // 5 minutes cache for performance
 
         async function fetchAds() {
             try {
@@ -82,8 +82,14 @@ export const AdSlotGroup = memo(function AdSlotGroup({
                     const cached = sessionStorage.getItem(cacheKey);
                     if (cached) {
                         try {
-                            const { data, timestamp } = JSON.parse(cached);
-                            if (Date.now() - timestamp < cacheTTL) {
+                            const { data, timestamp, configVersion } = JSON.parse(cached);
+                            const currentConfigVersion = localStorage.getItem('ad_config_version') || '0';
+
+                            // Use cache if: within TTL AND config version hasn't changed
+                            const isCacheValid = Date.now() - timestamp < cacheTTL;
+                            const isConfigUnchanged = configVersion === currentConfigVersion;
+
+                            if (isCacheValid && isConfigUnchanged) {
                                 setAds(data.ads ?? []);
                                 setSlotId(data.slotId);
                                 setSlotConfig(data.slotConfig);
@@ -124,11 +130,13 @@ export const AdSlotGroup = memo(function AdSlotGroup({
 
                 if (cancelled) return;
 
-                // Cache the response
+                // Cache the response with config version for smart invalidation
                 if (typeof window !== 'undefined') {
+                    const configVersion = localStorage.getItem('ad_config_version') || '0';
                     sessionStorage.setItem(cacheKey, JSON.stringify({
                         data,
                         timestamp: Date.now(),
+                        configVersion, // Store version to detect admin changes
                     }));
                 }
 

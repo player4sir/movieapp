@@ -84,6 +84,10 @@ export interface CreateSlotServiceInput {
   height: number;
   rotationStrategy?: RotationStrategy;
   enabled?: boolean;
+  // Multi-ad display settings
+  displayMode?: 'cover' | 'contain';
+  maxVisible?: number;
+  carouselInterval?: number;
 }
 
 export interface UpdateSlotServiceInput {
@@ -93,6 +97,10 @@ export interface UpdateSlotServiceInput {
   height?: number;
   rotationStrategy?: RotationStrategy;
   enabled?: boolean;
+  // Multi-ad display settings
+  displayMode?: 'cover' | 'contain';
+  maxVisible?: number;
+  carouselInterval?: number;
 }
 
 export interface AdDeliveryContext {
@@ -407,6 +415,10 @@ export async function createSlot(input: CreateSlotServiceInput): Promise<AdSlot>
     height: input.height,
     rotationStrategy: input.rotationStrategy,
     enabled: input.enabled,
+    // Multi-ad display settings
+    displayMode: input.displayMode,
+    maxVisible: input.maxVisible,
+    carouselInterval: input.carouselInterval,
   };
 
   return adSlotRepository.create(createInput);
@@ -430,6 +442,10 @@ export async function updateSlot(id: string, input: UpdateSlotServiceInput): Pro
     height: input.height,
     rotationStrategy: input.rotationStrategy,
     enabled: input.enabled,
+    // Multi-ad display settings
+    displayMode: input.displayMode,
+    maxVisible: input.maxVisible,
+    carouselInterval: input.carouselInterval,
   };
 
   const updated = await adSlotRepository.update(id, updateInput);

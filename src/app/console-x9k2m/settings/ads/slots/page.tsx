@@ -141,6 +141,8 @@ export default function AdminAdSlotsPage() {
             if (slot) newMap.set(preset.position, { ...slot, enabled: !slot.enabled });
             return newMap;
           });
+          // Invalidate ad cache when slot enabled/disabled status changes
+          localStorage.setItem('ad_config_version', Date.now().toString());
         }
       } else {
         // Create new slot with all fields
@@ -166,6 +168,8 @@ export default function AdminAdSlotsPage() {
             newMap.set(preset.position, { ...data.data, assignedAds: [] });
             return newMap;
           });
+          // Invalidate ad cache when new slot is created
+          localStorage.setItem('ad_config_version', Date.now().toString());
         }
       }
     } catch (err) {
@@ -205,6 +209,8 @@ export default function AdminAdSlotsPage() {
           });
         }
         setAssignModalOpen(false);
+        // Invalidate ad cache when ad is assigned to slot
+        localStorage.setItem('ad_config_version', Date.now().toString());
       }
     } catch (err) {
       console.error('Assign ad error:', err);
@@ -231,6 +237,8 @@ export default function AdminAdSlotsPage() {
           if (s) newMap.set(position, { ...s, assignedAds: s.assignedAds.filter(a => a.id !== adId) });
           return newMap;
         });
+        // Invalidate ad cache when ad is removed from slot
+        localStorage.setItem('ad_config_version', Date.now().toString());
       }
     } catch (err) {
       console.error('Remove ad error:', err);
@@ -276,6 +284,12 @@ export default function AdminAdSlotsPage() {
           return newMap;
         });
         setSettingsModalOpen(false);
+
+        // Invalidate ad slot cache globally - update version timestamp
+        // Frontend AdSlotGroup component will detect this and refresh cache
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('ad_config_version', Date.now().toString());
+        }
       }
     } catch (err) {
       console.error('Save settings error:', err);

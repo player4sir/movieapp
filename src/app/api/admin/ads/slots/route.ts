@@ -112,6 +112,10 @@ export async function POST(request: NextRequest) {
       height: Math.floor(body.height),
       rotationStrategy: body.rotationStrategy,
       enabled: body.enabled ?? true,
+      // Multi-ad display settings
+      displayMode: body.displayMode,
+      maxVisible: body.maxVisible !== undefined ? Math.floor(body.maxVisible) : undefined,
+      carouselInterval: body.carouselInterval !== undefined ? Math.floor(body.carouselInterval) : undefined,
     });
 
     return NextResponse.json({ data: slot }, { status: 201 });

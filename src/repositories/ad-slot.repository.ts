@@ -15,6 +15,10 @@ export interface CreateAdSlotInput {
   height: number;
   rotationStrategy?: RotationStrategy;
   enabled?: boolean;
+  // Multi-ad display settings
+  displayMode?: 'cover' | 'contain';
+  maxVisible?: number;
+  carouselInterval?: number;
 }
 
 export interface UpdateAdSlotInput {
@@ -24,6 +28,10 @@ export interface UpdateAdSlotInput {
   height?: number;
   rotationStrategy?: RotationStrategy;
   enabled?: boolean;
+  // Multi-ad display settings
+  displayMode?: 'cover' | 'contain';
+  maxVisible?: number;
+  carouselInterval?: number;
 }
 
 // ============================================
@@ -107,6 +115,10 @@ export class AdSlotRepository extends BaseRepository {
         height: input.height,
         rotationStrategy: input.rotationStrategy ?? 'random',
         enabled: input.enabled ?? true,
+        // Multi-ad display settings
+        displayMode: input.displayMode ?? 'cover',
+        maxVisible: input.maxVisible ?? 3,
+        carouselInterval: input.carouselInterval ?? 5,
         updatedAt: new Date(),
       }).returning();
       return slot;
@@ -134,6 +146,10 @@ export class AdSlotRepository extends BaseRepository {
       if (input.height !== undefined) updateData.height = input.height;
       if (input.rotationStrategy !== undefined) updateData.rotationStrategy = input.rotationStrategy;
       if (input.enabled !== undefined) updateData.enabled = input.enabled;
+      // Multi-ad display settings
+      if (input.displayMode !== undefined) updateData.displayMode = input.displayMode;
+      if (input.maxVisible !== undefined) updateData.maxVisible = input.maxVisible;
+      if (input.carouselInterval !== undefined) updateData.carouselInterval = input.carouselInterval;
 
       const [slot] = await this.db.update(adSlots)
         .set(updateData)
