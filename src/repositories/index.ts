@@ -134,3 +134,19 @@ export type {
 } from './ad-click.repository';
 
 export * from './coin-order.repository';
+
+// Agent system repositories
+export { AgentLevelRepository } from './agent-level.repository';
+export type {
+  CreateAgentLevelInput,
+  UpdateAgentLevelInput,
+} from './agent-level.repository';
+
+export { AgentRecordRepository } from './agent-record.repository';
+export type {
+  CreateAgentRecordInput,
+  UpdateAgentRecordInput,
+  AgentRecordListParams,
+  AgentRecordListResult,
+  AgentReportSummary,
+} from './agent-record.repository';

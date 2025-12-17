@@ -593,6 +593,64 @@ export const adClicksRelations = relations(adClicks, ({ one }) => ({
 }));
 
 // ============================================
+// Agent Commission Report System Tables
+// ============================================
+
+export const agentRecordStatusEnum = pgEnum('AgentRecordStatus', ['pending', 'settled']);
+
+export const agentLevels = pgTable('AgentLevel', {
+  id: text('id').primaryKey(),
+  name: varchar('name', { length: 50 }).notNull(),           // 等级名称：新人、一级、二级等
+  sortOrder: integer('sortOrder').default(0).notNull(),       // 排序
+  recruitRequirement: varchar('recruitRequirement', { length: 100 }).default('').notNull(), // 招代理数量要求描述
+  dailyPerformance: integer('dailyPerformance').default(0).notNull(), // 每天业绩要求（元）
+  commissionRate: integer('commissionRate').default(1000).notNull(),  // 佣金比例（基点，1000=10%）
+  hasBonus: boolean('hasBonus').default(false).notNull(),     // 是否有分红
+  bonusRate: integer('bonusRate').default(0).notNull(),       // 分红比例（基点）
+  enabled: boolean('enabled').default(true).notNull(),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').notNull(),
+}, (table) => [
+  index('AgentLevel_sortOrder_idx').on(table.sortOrder),
+  index('AgentLevel_enabled_idx').on(table.enabled),
+]);
+
+export const agentRecords = pgTable('AgentRecord', {
+  id: text('id').primaryKey(),
+  agentName: varchar('agentName', { length: 100 }).notNull(), // 代理商名称
+  agentContact: varchar('agentContact', { length: 100 }).default('').notNull(), // 联系方式
+  levelId: text('levelId').notNull(),                          // 当前等级ID
+  month: varchar('month', { length: 7 }).notNull(),            // 月份 (YYYY-MM)
+  recruitCount: integer('recruitCount').default(0).notNull(),  // 本月招代理数量
+  dailySales: integer('dailySales').default(0).notNull(),      // 每天业绩（元）
+  totalSales: integer('totalSales').default(0).notNull(),      // 月总业绩（元）
+  commissionAmount: integer('commissionAmount').default(0).notNull(), // 佣金金额（分）
+  bonusAmount: integer('bonusAmount').default(0).notNull(),    // 分红金额（分）
+  totalEarnings: integer('totalEarnings').default(0).notNull(), // 总收入（分）
+  status: agentRecordStatusEnum('status').default('pending').notNull(),
+  note: text('note').default('').notNull(),                    // 备注
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').notNull(),
+}, (table) => [
+  index('AgentRecord_levelId_idx').on(table.levelId),
+  index('AgentRecord_month_idx').on(table.month),
+  index('AgentRecord_status_idx').on(table.status),
+  index('AgentRecord_agentName_idx').on(table.agentName),
+]);
+
+// Agent System Relations
+export const agentLevelsRelations = relations(agentLevels, ({ many }) => ({
+  records: many(agentRecords),
+}));
+
+export const agentRecordsRelations = relations(agentRecords, ({ one }) => ({
+  level: one(agentLevels, {
+    fields: [agentRecords.levelId],
+    references: [agentLevels.id],
+  }),
+}));
+
+// ============================================
 // Type Exports (for type inference)
 // ============================================
 
@@ -649,6 +707,13 @@ export type NewAdSlotAssignment = InferInsertModel<typeof adSlotAssignments>;
 export type NewAdImpression = InferInsertModel<typeof adImpressions>;
 export type NewAdClick = InferInsertModel<typeof adClicks>;
 
+// Agent system types
+export type AgentLevel = InferSelectModel<typeof agentLevels>;
+export type AgentRecord = InferSelectModel<typeof agentRecords>;
+
+export type NewAgentLevel = InferInsertModel<typeof agentLevels>;
+export type NewAgentRecord = InferInsertModel<typeof agentRecords>;
+
 // Rotation strategy enum values
 export type RotationStrategy = 'random' | 'sequential';
 
@@ -695,4 +760,6 @@ export const allTables = {
   adSlotAssignments,
   adImpressions,
   adClicks,
+  agentLevels,
+  agentRecords,
 };
