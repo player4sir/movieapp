@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { useAuth, useCoins } from '@/hooks';
 import { BottomNav } from '@/components/layout/BottomNav';
+import { Sidebar } from '@/components/layout/Sidebar';
 import { RechargeModal } from '@/components/coins';
 import { PaymentModal } from '@/components/membership';
 import { ChangePasswordModal } from '@/components/profile/ChangePasswordModal';
@@ -162,201 +163,210 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      {/* Header - with safe area padding for PWA */}
-      <div
-        className="px-4 pb-4 bg-gradient-to-b from-primary/5 to-transparent"
-        style={{ paddingTop: 'max(1.5rem, env(safe-area-inset-top))' }}
-      >
-        {/* User Profile Card */}
-        <div className={`mt-6 p-4 rounded-2xl bg-gradient-to-br ${memberConfig.gradient} border border-white/5`}>
-          {/* User Info Row */}
-          <div className="flex items-center gap-3 mb-4">
-            {/* Avatar */}
-            <div className="w-14 h-14 rounded-full bg-surface border-2 border-white/10 flex items-center justify-center overflow-hidden flex-shrink-0">
-              {user.avatar ? (
-                <img src={user.avatar} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-xl font-bold text-foreground/50">
-                  {(user.nickname || user.username)?.[0]?.toUpperCase() || 'U'}
-                </span>
-              )}
-            </div>
+    <>
+      <Sidebar />
 
-            {/* Name & Level */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <h1 className="text-lg font-bold truncate">{user.nickname || user.username}</h1>
-                {memberLevel !== 'free' && memberConfig.icon && (
-                  <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${memberConfig.textColor} bg-white/10`}>
-                    <memberConfig.icon className="w-3 h-3" />
-                    {memberConfig.label}
-                  </div>
-                )}
-              </div>
-              <p className="text-xs text-foreground/50 mt-0.5">
-                {getMembershipStatusText()}
-              </p>
-            </div>
-
-            {/* Upgrade Button - hide for group members */}
-            {!membership?.isFromGroup && (
-              <button
-                onClick={() => setShowMembership(true)}
-                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all active:scale-95 ${memberLevel === 'free'
-                  ? 'bg-primary text-white'
-                  : 'bg-white/10 text-foreground/80'
-                  }`}
-              >
-                {memberLevel === 'free' ? '开通会员' : '续费'}
-              </button>
-            )}
-          </div>
-
-          {/* Coins & Checkin Row */}
-          <div className="flex gap-3">
-            {/* Coins */}
-            <Link
-              href="/profile/coins"
-              className="flex-1 bg-black/20 rounded-xl p-3 active:bg-black/30 transition-colors"
+      <div className="h-screen flex flex-col bg-background overflow-hidden lg:pl-64">
+        <main className="flex-1 overflow-auto bg-surface dark:bg-background">
+          <div className="max-w-screen-md mx-auto min-h-full pb-20">
+            {/* Header - with safe area padding for PWA */}
+            <div
+              className="px-4 pb-4 bg-gradient-to-b from-primary/5 to-transparent"
+              style={{ paddingTop: 'max(1.5rem, env(safe-area-inset-top))' }}
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center">
-                    <Coins className="w-4 h-4 text-amber-500" />
+              {/* User Profile Card */}
+              <div className={`mt-6 p-4 rounded-2xl bg-gradient-to-br ${memberConfig.gradient} border border-white/5`}>
+                {/* User Info Row */}
+                <div className="flex items-center gap-3 mb-4">
+                  {/* Avatar */}
+                  <div className="w-14 h-14 rounded-full bg-surface border-2 border-white/10 flex items-center justify-center overflow-hidden flex-shrink-0">
+                    {user.avatar ? (
+                      <img src={user.avatar} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-xl font-bold text-foreground/50">
+                        {(user.nickname || user.username)?.[0]?.toUpperCase() || 'U'}
+                      </span>
+                    )}
                   </div>
-                  <div>
-                    <div className="text-lg font-bold leading-tight">
-                      {balance?.balance?.toLocaleString() || 0}
-                    </div>
-                    <div className="text-xs text-foreground/50">金币</div>
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-foreground/30" />
-              </div>
-            </Link>
 
-            {/* Checkin */}
-            <button
-              onClick={handleCheckin}
-              disabled={!canCheckin || checkinLoading}
-              className={`flex-1 rounded-xl p-3 transition-all active:scale-[0.98] ${canCheckin
-                ? 'bg-primary/20 text-primary'
-                : 'bg-black/20 text-foreground/50'
-                }`}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  {checkinResult ? (
-                    <div className="text-lg font-bold text-green-400 animate-pulse">
-                      +{checkinResult.coins}
+                  {/* Name & Level */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h1 className="text-lg font-bold truncate">{user.nickname || user.username}</h1>
+                      {memberLevel !== 'free' && memberConfig.icon && (
+                        <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${memberConfig.textColor} bg-white/10`}>
+                          <memberConfig.icon className="w-3 h-3" />
+                          {memberConfig.label}
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <div className={`text-lg font-bold leading-tight ${canCheckin ? '' : 'text-foreground/60'}`}>
-                      {checkinLoading ? '...' : canCheckin ? '签到' : '已签到'}
-                    </div>
+                    <p className="text-xs text-foreground/50 mt-0.5">
+                      {getMembershipStatusText()}
+                    </p>
+                  </div>
+
+                  {/* Upgrade Button - hide for group members */}
+                  {!membership?.isFromGroup && (
+                    <button
+                      onClick={() => setShowMembership(true)}
+                      className={`px-4 py-2 rounded-xl text-sm font-medium transition-all active:scale-95 ${memberLevel === 'free'
+                        ? 'bg-primary text-white'
+                        : 'bg-white/10 text-foreground/80'
+                        }`}
+                    >
+                      {memberLevel === 'free' ? '开通会员' : '续费'}
+                    </button>
                   )}
-                  <div className="text-xs text-foreground/50">
-                    {streakCount > 0 ? `连续${streakCount}天` : '每日签到'}
-                  </div>
                 </div>
-                {canCheckin && (
-                  <div className="w-8 h-8 rounded-full bg-primary/30 flex items-center justify-center">
-                    <Sparkles className="w-4 h-4" />
+
+                {/* Coins & Checkin Row */}
+                <div className="flex gap-3">
+                  {/* Coins */}
+                  <Link
+                    href="/profile/coins"
+                    className="flex-1 bg-black/20 rounded-xl p-3 active:bg-black/30 transition-colors"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center">
+                          <Coins className="w-4 h-4 text-amber-500" />
+                        </div>
+                        <div>
+                          <div className="text-lg font-bold leading-tight">
+                            {balance?.balance?.toLocaleString() || 0}
+                          </div>
+                          <div className="text-xs text-foreground/50">金币</div>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-foreground/30" />
+                    </div>
+                  </Link>
+
+                  {/* Checkin */}
+                  <button
+                    onClick={handleCheckin}
+                    disabled={!canCheckin || checkinLoading}
+                    className={`flex-1 rounded-xl p-3 transition-all active:scale-[0.98] ${canCheckin
+                      ? 'bg-primary/20 text-primary'
+                      : 'bg-black/20 text-foreground/50'
+                      }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        {checkinResult ? (
+                          <div className="text-lg font-bold text-green-400 animate-pulse">
+                            +{checkinResult.coins}
+                          </div>
+                        ) : (
+                          <div className={`text-lg font-bold leading-tight ${canCheckin ? '' : 'text-foreground/60'}`}>
+                            {checkinLoading ? '...' : canCheckin ? '签到' : '已签到'}
+                          </div>
+                        )}
+                        <div className="text-xs text-foreground/50">
+                          {streakCount > 0 ? `连续${streakCount}天` : '每日签到'}
+                        </div>
+                      </div>
+                      {canCheckin && (
+                        <div className="w-8 h-8 rounded-full bg-primary/30 flex items-center justify-center">
+                          <Sparkles className="w-4 h-4" />
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Menu Sections */}
+            <div className="px-4 space-y-4">
+              {/* My Content */}
+              <div>
+                <h2 className="text-xs font-medium text-foreground/40 uppercase tracking-wider mb-2 px-1">
+                  我的内容
+                </h2>
+                <div className="bg-surface rounded-2xl overflow-hidden divide-y divide-surface-secondary">
+                  <MenuItem
+                    href="/profile/favorites"
+                    icon={Heart}
+                    label="我的收藏"
+                  />
+                  <MenuItem
+                    href="/profile/history"
+                    icon={History}
+                    label="观看历史"
+                  />
+                </div>
+              </div>
+
+              {/* Services */}
+              <div>
+                <h2 className="text-xs font-medium text-foreground/40 uppercase tracking-wider mb-2 px-1">
+                  服务中心
+                </h2>
+                <div className="bg-surface rounded-2xl overflow-hidden divide-y divide-surface-secondary">
+                  <MenuItem
+                    href="/share"
+                    icon={Share2}
+                    label="邀请好友"
+                    badge="赚金币"
+                  />
+                  <MenuItem
+                    onClick={() => setShowRecharge(true)}
+                    icon={CreditCard}
+                    label="充值中心"
+                  />
+                  <MenuItem
+                    href="/profile/membership"
+                    icon={Crown}
+                    label="会员订单"
+                  />
+                  <MenuItem
+                    onClick={() => setShowChangePassword(true)}
+                    icon={KeyRound}
+                    label="修改密码"
+                  />
+                </div>
+              </div>
+
+              {/* Ad Slot */}
+              <AdSlotGroup
+                position="profile_bottom"
+                className="rounded-2xl overflow-hidden"
+              />
+
+              {/* Footer */}
+              <div className="pt-4 pb-8 space-y-4">
+                {/* Logout */}
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center justify-center gap-2 py-3 text-sm text-foreground/40 hover:text-red-400 transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                  退出登录
+                </button>
+
+                {/* Version */}
+                <p
+                  onClick={handleVersionClick}
+                  className="text-center text-xs text-foreground/20 select-none cursor-default"
+                >
+                  Version 1.0.0
+                </p>
+
+                {/* Debug hint */}
+                {debugClicks > 3 && debugClicks < 7 && (
+                  <div className="fixed bottom-24 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-foreground/80 backdrop-blur-md rounded-full text-background text-xs font-medium animate-in fade-in zoom-in duration-200">
+                    再点击 {7 - debugClicks} 次进入后台
                   </div>
                 )}
               </div>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Menu Sections */}
-      <div className="px-4 space-y-4">
-        {/* My Content */}
-        <div>
-          <h2 className="text-xs font-medium text-foreground/40 uppercase tracking-wider mb-2 px-1">
-            我的内容
-          </h2>
-          <div className="bg-surface rounded-2xl overflow-hidden divide-y divide-surface-secondary">
-            <MenuItem
-              href="/profile/favorites"
-              icon={Heart}
-              label="我的收藏"
-            />
-            <MenuItem
-              href="/profile/history"
-              icon={History}
-              label="观看历史"
-            />
-          </div>
-        </div>
-
-        {/* Services */}
-        <div>
-          <h2 className="text-xs font-medium text-foreground/40 uppercase tracking-wider mb-2 px-1">
-            服务中心
-          </h2>
-          <div className="bg-surface rounded-2xl overflow-hidden divide-y divide-surface-secondary">
-            <MenuItem
-              href="/share"
-              icon={Share2}
-              label="邀请好友"
-              badge="赚金币"
-            />
-            <MenuItem
-              onClick={() => setShowRecharge(true)}
-              icon={CreditCard}
-              label="充值中心"
-            />
-            <MenuItem
-              href="/profile/membership"
-              icon={Crown}
-              label="会员订单"
-            />
-            <MenuItem
-              onClick={() => setShowChangePassword(true)}
-              icon={KeyRound}
-              label="修改密码"
-            />
-          </div>
-        </div>
-
-        {/* Ad Slot */}
-        <AdSlotGroup
-          position="profile_bottom"
-          className="rounded-2xl overflow-hidden"
-        />
-
-        {/* Footer */}
-        <div className="pt-4 pb-8 space-y-4">
-          {/* Logout */}
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 py-3 text-sm text-foreground/40 hover:text-red-400 transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-            退出登录
-          </button>
-
-          {/* Version */}
-          <p
-            onClick={handleVersionClick}
-            className="text-center text-xs text-foreground/20 select-none cursor-default"
-          >
-            Version 1.0.0
-          </p>
-
-          {/* Debug hint */}
-          {debugClicks > 3 && debugClicks < 7 && (
-            <div className="fixed bottom-24 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-foreground/80 backdrop-blur-md rounded-full text-background text-xs font-medium animate-in fade-in zoom-in duration-200">
-              再点击 {7 - debugClicks} 次进入后台
             </div>
-          )}
-        </div>
-      </div>
 
-      <BottomNav />
+          </div >
+        </main>
+
+        <BottomNav />
+      </div>
 
       {/* Modals */}
       <RechargeModal
@@ -374,7 +384,7 @@ export default function ProfilePage() {
         isOpen={showChangePassword}
         onClose={() => setShowChangePassword(false)}
       />
-    </div >
+    </>
   );
 }
 

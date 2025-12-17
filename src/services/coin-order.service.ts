@@ -45,10 +45,30 @@ export async function createCoinOrder(input: CreateCoinOrderInput): Promise<Coin
     // P1 Fix: Validate against configured recharge packages
     const packageConfig = await getConfig('recharge_packages');
     const packages = Array.isArray(packageConfig.value) ? packageConfig.value : [];
+
+    // Frontend sends:
+    // - amount = coins + bonus (total coins to receive)
+    // - price = price * 100 (in cents, as per line 131 in RechargeModal)
+    // Config stores:
+    // - coins: base coin amount
+    // - bonus: optional bonus coins
+    // - price: in yuan (not cents)
     const validPackage = packages.find(
-        (pkg: { coins: number; price: number }) => pkg.coins === amount && pkg.price === price
+        (pkg: { coins: number; price: number; bonus?: number }) => {
+            const totalCoins = pkg.coins + (pkg.bonus || 0);
+            const priceInCents = Math.round(pkg.price * 100);
+            return totalCoins === amount && priceInCents === price;
+        }
     );
     if (!validPackage) {
+        console.error('Package validation failed:', {
+            receivedAmount: amount,
+            receivedPrice: price,
+            availablePackages: packages.map((p: { coins: number; price: number; bonus?: number }) => ({
+                totalCoins: p.coins + (p.bonus || 0),
+                priceInCents: Math.round(p.price * 100)
+            }))
+        });
         throw { ...COIN_ORDER_ERRORS.INVALID_PACKAGE };
     }
 

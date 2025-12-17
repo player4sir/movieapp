@@ -302,31 +302,21 @@ export async function GET(request: NextRequest) {
         // 解析相对URL为绝对URL
         const absoluteUrl = resolveUrl(trimmedLine, baseUrl, finalOrigin);
 
-        // 代理.ts分段 - 使用签名 token 保护
-        if (trimmedLine.endsWith('.ts') || trimmedLine.includes('.ts?') ||
-          trimmedLine.includes('.ts#') || /\.ts\b/.test(trimmedLine)) {
-          const tsToken = generatePlaybackToken({
-            url: absoluteUrl,
-            isPreview: false
-          });
-          return `/api/proxy/ts?token=${tsToken}`;
-        }
+        // 为资源生成播放 token
+        const resToken = generatePlaybackToken({
+          url: absoluteUrl,
+          isPreview: false
+        });
 
         // 代理嵌套的m3u8文件
         if (trimmedLine.endsWith('.m3u8') || trimmedLine.includes('.m3u8?') ||
           trimmedLine.includes('.m3u8#') || /\.m3u8\b/.test(trimmedLine)) {
           const adFreeParam = adFree ? '&adFree=true' : '';
-          const subToken = generatePlaybackToken({
-            url: absoluteUrl,
-            isPreview: false
-          });
-          return `/api/proxy/m3u8?token=${subToken}${adFreeParam}`;
+          return `/api/proxy/m3u8?token=${resToken}${adFreeParam}`;
         }
 
-        // 其他文件类型也通过代理（如.key文件）
-        if (!trimmedLine.startsWith('/api/proxy/')) {
-          return `/api/proxy/ts?url=${encodeURIComponent(absoluteUrl)}`;
-        }
+        // 其他所有资源（.ts, .key, .png 等）通过 ts 代理处理签名验证和直连/Worker回退
+        return `/api/proxy/ts?token=${resToken}`;
 
         return line;
       }).join('\n');

@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { OrderHistory } from '@/components/membership';
+import { Sidebar } from '@/components/layout/Sidebar';
 
 export default function MembershipOrdersPage() {
   const router = useRouter();
@@ -38,28 +39,36 @@ export default function MembershipOrdersPage() {
   if (!isAuthenticated) return null;
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b border-surface-secondary">
-        <div className="flex items-center gap-3 px-4 py-3">
-          <button
-            onClick={() => router.back()}
-            className="p-1 -ml-1 text-foreground/70 hover:text-foreground"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <h1 className="text-lg font-semibold">会员订单</h1>
-        </div>
-      </div>
+    <>
+      <Sidebar />
 
-      {/* Order History */}
-      <div className="p-4">
-        <OrderHistory />
-      </div>
+      <div className="h-screen flex flex-col bg-background overflow-hidden lg:pl-64">
+        {/* Header - Responsive */}
+        <header className="fixed top-0 left-0 lg:left-64 right-0 z-50 bg-background/95 backdrop-blur-sm border-b border-surface-secondary">
+          <div className="flex items-center h-14 px-4 pt-safe-top">
+            <button
+              onClick={() => router.back()}
+              className="flex items-center justify-center w-10 h-10 -ml-2 rounded-full hover:bg-surface active:bg-surface-secondary"
+              aria-label="返回"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <h1 className="flex-1 text-center text-lg font-semibold">会员订单</h1>
+            <div className="w-10" />
+          </div>
+        </header>
 
-      <BottomNav />
-    </div>
+        {/* Content */}
+        <main className="flex-1 overflow-auto pt-14 pb-4 bg-surface dark:bg-background">
+          <div className="max-w-screen-md mx-auto min-h-full p-4">
+            <OrderHistory />
+          </div>
+        </main>
+
+        <BottomNav />
+      </div>
+    </>
   );
 }
