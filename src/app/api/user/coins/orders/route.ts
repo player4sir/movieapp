@@ -28,11 +28,31 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // Resolve agent code if provided
+        let agentId: string | undefined;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if ((body as any).agentCode) {
+            const { db } = await import('@/db');
+            const { users } = await import('@/db/schema');
+            const { eq } = await import('drizzle-orm');
+
+            const agent = await db.query.users.findFirst({
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                where: eq(users.referralCode, (body as any).agentCode),
+                columns: { id: true }
+            });
+
+            if (agent) {
+                agentId = agent.id;
+            }
+        }
+
         const order = await createCoinOrder({
             userId: user.id,
             amount: Number(amount),
-            price: Number(price), // Assuming frontend sends price in cents or we convert here. Let's assume frontend sends correct units matching schema.
+            price: Number(price),
             paymentType: paymentType as PaymentType,
+            agentId,
         });
 
         return NextResponse.json({ order }, { status: 201 });

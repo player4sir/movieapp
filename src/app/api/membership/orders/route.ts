@@ -53,10 +53,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Resolve agent code if provided
+    let agentId: string | undefined;
+    if (body.agentCode) {
+      const { db } = await import('@/db');
+      const { users } = await import('@/db/schema');
+      const { eq } = await import('drizzle-orm');
+
+      const agent = await db.query.users.findFirst({
+        where: eq(users.referralCode, body.agentCode),
+        columns: { id: true }
+      });
+
+      if (agent) {
+        agentId = agent.id;
+      }
+    }
+
     const order = await createOrder({
       userId: user.id,
       planId,
       paymentType: paymentType as PaymentType | undefined,
+      agentId,
     });
 
     return NextResponse.json({

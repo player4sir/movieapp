@@ -21,6 +21,7 @@ export interface CreateCoinOrderInput {
     amount: number;
     price: number; // In cents
     paymentType?: PaymentType;
+    agentId?: string;
 }
 
 export interface SubmitProofInput {
@@ -36,7 +37,7 @@ function generateOrderNo(): string {
 }
 
 export async function createCoinOrder(input: CreateCoinOrderInput): Promise<CoinOrder> {
-    const { userId, amount, price, paymentType } = input;
+    const { userId, amount, price, paymentType, agentId } = input;
 
     if (amount <= 0 || price <= 0) {
         throw { ...COIN_ORDER_ERRORS.INVALID_AMOUNT };
@@ -89,6 +90,7 @@ export async function createCoinOrder(input: CreateCoinOrderInput): Promise<Coin
         paymentType,
         status: 'pending',
         remarkCode,
+        agentId, // Store explicit attribution
         updatedAt: new Date(),
     });
 
@@ -164,14 +166,21 @@ export async function approveCoinOrder(orderId: string, adminId: string) {
         throw { ...COIN_ORDER_ERRORS.ORDER_ALREADY_PROCESSED };
     }
 
-    // Add coins to user - this is safe because we only reach here if update succeeded
+    // Add coins to user - this is safe because we only reach      // 4. Add coins to user balance
     await addCoins(
         order.userId,
         order.amount,
         'recharge',
-        `充值 ${order.amount} 金币`,
-        { orderId: order.id, orderNo: order.orderNo }
+        `订单充值 #${order.id}`,
     );
+
+    // 5. Process Agent Commission
+    try {
+        const { processOrderCommission } = await import('./agent.service');
+        await processOrderCommission(order.userId, order.price, 'coin', order.agentId);
+    } catch (error) {
+        console.error('Failed to process agent commission for coin order:', error);
+    }
 
     return updatedOrder;
 }

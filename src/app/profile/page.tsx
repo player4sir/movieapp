@@ -23,7 +23,8 @@ import {
   CreditCard,
   Crown,
   Sparkles,
-  KeyRound
+  KeyRound,
+  Briefcase // Agent Icon
 } from 'lucide-react';
 import { useAuth, useCoins } from '@/hooks';
 import { BottomNav } from '@/components/layout/BottomNav';
@@ -74,6 +75,8 @@ export default function ProfilePage() {
   const [membership, setMembership] = useState<MembershipData | null>(null);
   const [checkinResult, setCheckinResult] = useState<{ coins: number; streak: number } | null>(null);
   const [debugClicks, setDebugClicks] = useState(0);
+  // Agent status - must be declared with other hooks before any conditional returns
+  const [agentStatus, setAgentStatus] = useState<'none' | 'pending' | 'active' | 'rejected'>('none');
 
   // Fetch membership status using subscription API (includes group permissions)
   useEffect(() => {
@@ -113,6 +116,24 @@ export default function ProfilePage() {
       router.replace('/auth/login');
     }
   }, [isAuthenticated, loading, router]);
+
+  // Fetch Agent Status - must be before any conditional returns
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const token = getAccessToken();
+    fetch('/api/user/agent', {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    })
+      .then(res => res.json())
+      .then(res => {
+        if (res.data) {
+          setAgentStatus(res.data.status);
+        } else {
+          setAgentStatus('none');
+        }
+      })
+      .catch(() => setAgentStatus('none'));
+  }, [isAuthenticated, getAccessToken]);
 
   const handleCheckin = async () => {
     const result = await performCheckin();
@@ -299,6 +320,23 @@ export default function ProfilePage() {
                     icon={History}
                     label="观看历史"
                   />
+                  {/* Agent Entry */}
+                  {agentStatus === 'active' ? (
+                    <MenuItem
+                      href="/agent"
+                      icon={Briefcase}
+                      label="代理中心"
+                      badge="赚收益"
+                    />
+                  ) : (
+                    <MenuItem
+                      href={agentStatus === 'pending' ? '#' : '/agent/apply'} // Pending state could show a toast or simplified status
+                      onClick={agentStatus === 'pending' ? () => alert('您的申请正在审核中') : undefined}
+                      icon={Briefcase}
+                      label="成为合伙人"
+                      badge={agentStatus === 'pending' ? '审核中' : 'Hot'}
+                    />
+                  )}
                 </div>
               </div>
 

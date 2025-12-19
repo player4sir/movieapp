@@ -95,6 +95,7 @@ export async function POST(request: NextRequest) {
             dailySales: body.dailySales ?? 0,
             totalSales: body.totalSales ?? 0,
             note: body.note ?? '',
+            userId: body.userId,
         });
 
         return NextResponse.json({ data: record }, { status: 201 });

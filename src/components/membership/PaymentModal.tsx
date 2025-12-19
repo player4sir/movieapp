@@ -44,6 +44,7 @@ export function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModalProps) 
   const [orderId, setOrderId] = useState<string | null>(null);
   const [orderNo, setOrderNo] = useState<string | null>(null);
   const [remarkCode, setRemarkCode] = useState<string | null>(null);
+  const [agentCode, setAgentCode] = useState('');
 
   // UI state
   const [coinBalance, setCoinBalance] = useState(0);
@@ -57,6 +58,7 @@ export function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModalProps) 
     setOrderId(null);
     setOrderNo(null);
     setRemarkCode(null);
+    setAgentCode('');
     setError(null);
   }, []);
 
@@ -173,6 +175,7 @@ export function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModalProps) 
         body: JSON.stringify({
           planId: selectedPlan.id,
           paymentType: selectedPaymentType,
+          agentCode: agentCode || undefined, // Pass agent code
         }),
       });
 
@@ -308,6 +311,18 @@ export function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModalProps) 
                     );
                   })}
                 </div>
+              </div>
+
+              {/* Agent Code Input */}
+              <div className="mb-4">
+                <div className="text-sm text-foreground/60 mb-2">推荐人/代理代码 (选填)</div>
+                <input
+                  type="text"
+                  value={agentCode}
+                  onChange={(e) => setAgentCode(e.target.value)}
+                  placeholder="如有推荐人，请在此填写代码"
+                  className="w-full px-4 py-3 bg-surface rounded-lg border border-transparent focus:border-primary/50 outline-none transition-all"
+                />
               </div>
 
               <div className="border-t border-surface-secondary my-4"></div>

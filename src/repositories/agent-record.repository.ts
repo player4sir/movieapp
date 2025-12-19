@@ -21,6 +21,7 @@ export interface CreateAgentRecordInput {
     totalEarnings?: number;
     status?: 'pending' | 'settled';
     note?: string;
+    userId?: string;
 }
 
 export interface UpdateAgentRecordInput {
@@ -43,6 +44,7 @@ export interface AgentRecordListParams {
     pageSize?: number;
     month?: string;
     levelId?: string;
+    userId?: string;
     status?: 'pending' | 'settled';
     search?: string;
     sortBy?: 'createdAt' | 'agentName' | 'totalSales' | 'totalEarnings';
@@ -96,6 +98,23 @@ export class AgentRecordRepository extends BaseRepository {
     }
 
     /**
+     * Find agent record by User ID and Month
+     */
+    async findByUserIdAndMonth(userId: string, month: string): Promise<AgentRecord | null> {
+        try {
+            const result = await this.db.query.agentRecords.findFirst({
+                where: and(
+                    eq(agentRecords.userId, userId),
+                    eq(agentRecords.month, month)
+                ),
+            });
+            return result ?? null;
+        } catch (error) {
+            throw new RepositoryError('Failed to find agent record by user and month', 'FIND_ERROR', error);
+        }
+    }
+
+    /**
      * List agent records with pagination and filters
      */
     async list(params: AgentRecordListParams = {}): Promise<AgentRecordListResult> {
@@ -119,6 +138,9 @@ export class AgentRecordRepository extends BaseRepository {
             }
             if (levelId) {
                 conditions.push(eq(agentRecords.levelId, levelId));
+            }
+            if (params.userId) {
+                conditions.push(eq(agentRecords.userId, params.userId));
             }
             if (status) {
                 conditions.push(eq(agentRecords.status, status));
@@ -189,6 +211,7 @@ export class AgentRecordRepository extends BaseRepository {
                 totalEarnings: input.totalEarnings ?? 0,
                 status: input.status ?? 'pending',
                 note: input.note ?? '',
+                userId: input.userId,
                 updatedAt: new Date(),
             }).returning();
             return record;

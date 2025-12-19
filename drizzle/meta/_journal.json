@@ -71,6 +71,13 @@
       "when": 1765984978004,
       "tag": "0009_unique_captain_flint",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1766181795458,
+      "tag": "0010_bright_jazinda",
+      "breakpoints": true
     }
   ]
 }

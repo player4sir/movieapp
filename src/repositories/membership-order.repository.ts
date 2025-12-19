@@ -17,6 +17,7 @@ export interface CreateMembershipOrderInput {
   price: number;
   paymentType?: 'wechat' | 'alipay';
   remarkCode?: string;
+  agentId?: string; // Explicit agent attribution
 }
 
 export interface UpdateMembershipOrderInput {
@@ -74,6 +75,7 @@ export class MembershipOrderRepository extends BaseRepository {
         status: 'pending',
         paymentType: input.paymentType,
         remarkCode: input.remarkCode,
+        agentId: input.agentId, // Store explicit attribution
         updatedAt: new Date(),
       }).returning();
       return order;

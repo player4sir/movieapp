@@ -38,6 +38,7 @@ export const membershipOrders = pgTable('MembershipOrder', {
   reviewedBy: text('reviewedBy'),
   reviewedAt: timestamp('reviewedAt'),
   rejectReason: text('rejectReason'),
+  agentId: text('agentId'), // Explicit agent attribution
   createdAt: timestamp('createdAt').defaultNow().notNull(),
   updatedAt: timestamp('updatedAt').notNull(),
 }, (table) => [
@@ -45,6 +46,7 @@ export const membershipOrders = pgTable('MembershipOrder', {
   uniqueIndex('MembershipOrder_user_plan_pending_key').on(table.userId, table.planId).where(sql`status = 'pending'`),
   index('MembershipOrder_userId_idx').on(table.userId),
   index('MembershipOrder_planId_idx').on(table.planId),
+  index('MembershipOrder_agentId_idx').on(table.agentId),
   index('MembershipOrder_status_idx').on(table.status),
   index('MembershipOrder_createdAt_idx').on(table.createdAt),
 ]);
@@ -63,11 +65,13 @@ export const coinOrders = pgTable('CoinOrder', {
   reviewedBy: text('reviewedBy'),
   reviewedAt: timestamp('reviewedAt'),
   rejectReason: text('rejectReason'),
+  agentId: text('agentId'), // Explicit agent attribution
   createdAt: timestamp('createdAt').defaultNow().notNull(),
   updatedAt: timestamp('updatedAt').notNull(),
 }, (table) => [
   uniqueIndex('CoinOrder_orderNo_key').on(table.orderNo),
   index('CoinOrder_userId_idx').on(table.userId),
+  index('CoinOrder_agentId_idx').on(table.agentId),
   index('CoinOrder_status_idx').on(table.status),
   index('CoinOrder_createdAt_idx').on(table.createdAt),
 ]);
@@ -615,9 +619,33 @@ export const agentLevels = pgTable('AgentLevel', {
   index('AgentLevel_enabled_idx').on(table.enabled),
 ]);
 
+export const paymentMethodEnum = pgEnum('PaymentMethod', ['alipay', 'wechat', 'bank', 'kangxun']);
+
+export const agentProfileStatusEnum = pgEnum('AgentProfileStatus', ['pending', 'active', 'rejected', 'disabled']);
+
+export const agentProfiles = pgTable('AgentProfile', {
+  userId: text('userId').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  levelId: text('levelId').notNull(),                          // 当前等级ID
+  agentCode: varchar('agentCode', { length: 12 }).unique(),    // 代理商专属推广码
+  status: agentProfileStatusEnum('status').default('pending').notNull(),
+  realName: varchar('realName', { length: 100 }).default('').notNull(),
+  contact: varchar('contact', { length: 100 }).default('').notNull(),
+  paymentMethod: paymentMethodEnum('paymentMethod'),           // 收款方式
+  paymentAccount: text('paymentAccount'),                      // 收款账号
+  totalIncome: integer('totalIncome').default(0).notNull(),    // 总收入（分）
+  balance: integer('balance').default(0).notNull(),            // 可提现余额（分）
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').notNull(),
+}, (table) => [
+  index('AgentProfile_status_idx').on(table.status),
+  index('AgentProfile_levelId_idx').on(table.levelId),
+  uniqueIndex('AgentProfile_agentCode_key').on(table.agentCode),
+]);
+
 export const agentRecords = pgTable('AgentRecord', {
   id: text('id').primaryKey(),
-  agentName: varchar('agentName', { length: 100 }).notNull(), // 代理商名称
+  userId: text('userId'),                                      // 关联的用户ID (Nullable for legacy/manual records)
+  agentName: varchar('agentName', { length: 100 }).notNull(), // 代理商名称 (Snapshot or manual)
   agentContact: varchar('agentContact', { length: 100 }).default('').notNull(), // 联系方式
   levelId: text('levelId').notNull(),                          // 当前等级ID
   month: varchar('month', { length: 7 }).notNull(),            // 月份 (YYYY-MM)
@@ -632,15 +660,43 @@ export const agentRecords = pgTable('AgentRecord', {
   createdAt: timestamp('createdAt').defaultNow().notNull(),
   updatedAt: timestamp('updatedAt').notNull(),
 }, (table) => [
+  index('AgentRecord_userId_idx').on(table.userId),
   index('AgentRecord_levelId_idx').on(table.levelId),
   index('AgentRecord_month_idx').on(table.month),
   index('AgentRecord_status_idx').on(table.status),
   index('AgentRecord_agentName_idx').on(table.agentName),
 ]);
 
+export const settlementRecords = pgTable('SettlementRecord', {
+  id: text('id').primaryKey(),
+  userId: text('userId').notNull(),         // 代理商ID
+  amount: integer('amount').notNull(),      // 结算金额（分）
+  method: paymentMethodEnum('method').notNull(), // 结算方式
+  account: text('account').notNull(),       // 结算账号（快照）
+  transactionId: text('transactionId'),     // 交易流水号/备注
+  note: text('note'),                       // 备注
+  settledBy: text('settledBy'),             // 经手人（管理员ID）
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+}, (table) => [
+  index('SettlementRecord_userId_idx').on(table.userId),
+  index('SettlementRecord_createdAt_idx').on(table.createdAt),
+]);
+
 // Agent System Relations
+export const agentProfilesRelations = relations(agentProfiles, ({ one, many }) => ({
+  user: one(users, {
+    fields: [agentProfiles.userId],
+    references: [users.id],
+  }),
+  level: one(agentLevels, {
+    fields: [agentProfiles.levelId],
+    references: [agentLevels.id],
+  }),
+}));
+
 export const agentLevelsRelations = relations(agentLevels, ({ many }) => ({
   records: many(agentRecords),
+  profiles: many(agentProfiles),
 }));
 
 export const agentRecordsRelations = relations(agentRecords, ({ one }) => ({
@@ -708,11 +764,16 @@ export type NewAdImpression = InferInsertModel<typeof adImpressions>;
 export type NewAdClick = InferInsertModel<typeof adClicks>;
 
 // Agent system types
+// Agent system types
 export type AgentLevel = InferSelectModel<typeof agentLevels>;
 export type AgentRecord = InferSelectModel<typeof agentRecords>;
+export type AgentProfile = InferSelectModel<typeof agentProfiles>;
+export type SettlementRecord = InferSelectModel<typeof settlementRecords>;
 
 export type NewAgentLevel = InferInsertModel<typeof agentLevels>;
 export type NewAgentRecord = InferInsertModel<typeof agentRecords>;
+export type NewAgentProfile = InferInsertModel<typeof agentProfiles>;
+export type NewSettlementRecord = InferInsertModel<typeof settlementRecords>;
 
 // Rotation strategy enum values
 export type RotationStrategy = 'random' | 'sequential';
@@ -762,4 +823,6 @@ export const allTables = {
   adClicks,
   agentLevels,
   agentRecords,
+  agentProfiles,
+  settlementRecords,
 };

@@ -48,6 +48,7 @@ export interface CreateOrderInput {
   userId: string;
   planId: string;
   paymentType?: PaymentType;
+  agentId?: string;
 }
 
 export interface SubmitPaymentProofInput {
@@ -99,7 +100,7 @@ export async function getPaymentQRCodes(): Promise<PaymentQRCode[]> {
  * Requirements: 2.2, 2.4, 2.5
  */
 export async function createOrder(input: CreateOrderInput): Promise<MembershipOrder> {
-  const { userId, planId, paymentType } = input;
+  const { userId, planId, paymentType, agentId } = input;
 
   // Validate plan exists and is enabled
   const plan = await membershipPlanRepository.findById(planId);
@@ -138,6 +139,7 @@ export async function createOrder(input: CreateOrderInput): Promise<MembershipOr
     price: plan.price,
     paymentType,
     remarkCode,
+    agentId,
   });
 
   return order;
@@ -179,6 +181,8 @@ export async function submitPaymentProof(
   if (!updatedOrder) {
     throw { ...ORDER_ERRORS.ORDER_NOT_FOUND };
   }
+
+
 
   return updatedOrder;
 }
@@ -253,6 +257,14 @@ export async function approveOrder(
     order.memberLevel,
     order.duration
   );
+
+  // Process Agent Commission
+  try {
+    const { processOrderCommission } = await import('./agent.service');
+    await processOrderCommission(order.userId, order.price, 'membership', order.agentId);
+  } catch (error) {
+    console.error('Failed to process agent commission:', error);
+  }
 
   return {
     order: updatedOrder,

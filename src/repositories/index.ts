@@ -150,3 +150,6 @@ export type {
   AgentRecordListResult,
   AgentReportSummary,
 } from './agent-record.repository';
+
+export { AgentProfileRepository } from './agent-profile.repository';
+export { SettlementRecordRepository } from './settlement-record.repository';

@@ -61,11 +61,19 @@ function RegisterPageContent() {
     }
 
     // Auto-fill invite code from URL or localStorage
-    // Support both 'ref' (from share link) and 'invite' parameters
+    // Support 'ref' (user referral), 'invite', and 'agent' (agent promotion) parameters
     const codeFromUrl = searchParams.get('ref') || searchParams.get('invite');
+    const agentCode = searchParams.get('agent');
     const codeFromStorage = localStorage.getItem('referralCode');
+    const agentFromStorage = localStorage.getItem('agentCode');
 
-    if (codeFromUrl) {
+    // Agent code takes precedence
+    if (agentCode) {
+      setInviteCode(agentCode);
+      localStorage.setItem('agentCode', agentCode);
+    } else if (agentFromStorage) {
+      setInviteCode(agentFromStorage);
+    } else if (codeFromUrl) {
       setInviteCode(codeFromUrl);
       localStorage.setItem('referralCode', codeFromUrl);
     } else if (codeFromStorage) {

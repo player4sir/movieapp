@@ -43,26 +43,52 @@ export async function generateReferralCode(): Promise<string> {
 /**
  * Process referral: Link new user to inviter and distribute rewards.
  * 
- * Rewards:
+ * Supports two types of codes:
+ * - Agent Code (starts with 'A'): Links to agent for commission tracking
+ * - Referral Code: Regular user invitation for coin rewards
+ * 
+ * Rewards (for regular referral):
  * - Inviter: 50 coins
  * - Invitee: 10 coins
  */
 export async function processReferral(newUserId: string, referralCode: string): Promise<void> {
     if (!referralCode) return;
 
-    // 1. Find Inviter
-    const inviter = await db.query.users.findFirst({
-        where: eq(users.referralCode, referralCode),
-        columns: { id: true, username: true } // Fetch username for logging?
-    });
+    // Import agent-related modules
+    const { agentProfiles } = await import('@/db/schema');
 
-    if (!inviter) {
-        // Invalid code, ignore silently or log
-        console.warn(`Invalid referral code used: ${referralCode} by user ${newUserId}`);
+    // Check if this is an agent code (starts with 'A')
+    const isAgentCode = referralCode.startsWith('A') && referralCode.length === 8;
+
+    let inviterId: string | null = null;
+
+    if (isAgentCode) {
+        // Find agent by agentCode
+        const agentProfile = await db.query.agentProfiles.findFirst({
+            where: eq(agentProfiles.agentCode, referralCode),
+            columns: { userId: true, status: true }
+        });
+
+        if (agentProfile && agentProfile.status === 'active') {
+            inviterId = agentProfile.userId;
+        }
+    }
+
+    // If not found as agent code, try as regular referral code
+    if (!inviterId) {
+        const inviter = await db.query.users.findFirst({
+            where: eq(users.referralCode, referralCode),
+            columns: { id: true }
+        });
+        inviterId = inviter?.id || null;
+    }
+
+    if (!inviterId) {
+        console.warn(`Invalid referral/agent code used: ${referralCode} by user ${newUserId}`);
         return;
     }
 
-    if (inviter.id === newUserId) {
+    if (inviterId === newUserId) {
         // Self-referral protection
         return;
     }
@@ -81,14 +107,14 @@ export async function processReferral(newUserId: string, referralCode: string): 
     await db.transaction(async (tx) => {
         // 2. Link User (Update referredBy)
         await tx.update(users)
-            .set({ referredBy: inviter.id })
+            .set({ referredBy: inviterId })
             .where(eq(users.id, newUserId));
 
-        // 3. Reward Inviter
+        // 3. Reward Inviter (coin rewards for referrals)
         // Pass tx to ensure atomicity with the referral link update
         if (inviterReward > 0) {
             await addCoins(
-                inviter.id,
+                inviterId,
                 inviterReward,
                 'promotion',
                 '邀请好友奖励',
@@ -97,6 +123,10 @@ export async function processReferral(newUserId: string, referralCode: string): 
             );
         }
 
+        // Track recruit for agent system (regardless of coin rewards)
+        const { trackRecruit } = await import('./agent.service');
+        trackRecruit(inviterId).catch(console.error);
+
         // 4. Reward Invitee
         if (inviteeReward > 0) {
             await addCoins(
@@ -104,7 +134,7 @@ export async function processReferral(newUserId: string, referralCode: string): 
                 inviteeReward,
                 'promotion',
                 '新人注册奖励',
-                { inviterId: inviter.id, code: referralCode },
+                { inviterId, code: referralCode },
                 tx
             );
         }

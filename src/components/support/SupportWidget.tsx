@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { MessageCircle, X, Bot, User } from 'lucide-react';
+import { Headset, X, Bot, User } from 'lucide-react';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { usePathname } from 'next/navigation';
 
@@ -97,11 +97,11 @@ export function SupportWidget() {
             {/* Floating Button */}
             <button
                 onClick={() => setIsOpen(prev => !prev)}
-                className={`fixed bottom-20 right-4 lg:bottom-10 lg:right-10 z-50 p-4 rounded-full shadow-lg transition-all transform hover:scale-105 ${isOpen ? 'bg-surface-secondary text-foreground rotate-90' : 'bg-primary text-primary-foreground'
+                className={`fixed bottom-20 right-4 lg:bottom-10 lg:right-10 z-50 p-3 lg:p-4 rounded-full shadow-lg transition-all transform hover:scale-105 ${isOpen ? 'bg-surface-secondary text-foreground rotate-90' : 'bg-primary text-primary-foreground'
                     }`}
                 aria-label="在线客服"
             >
-                {isOpen ? <X className="w-6 h-6" /> : <MessageCircle className="w-6 h-6" />}
+                {isOpen ? <X className="w-5 h-5 lg:w-6 lg:h-6" /> : <Headset className="w-5 h-5 lg:w-6 lg:h-6" />}
             </button>
 
             {/* Chat Window */}

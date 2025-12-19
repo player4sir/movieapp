@@ -312,3 +312,125 @@ export function getCurrentMonth(): string {
     const month = String(now.getMonth() + 1).padStart(2, '0');
     return `${year}-${month}`;
 }
+/**
+ * Process order commission
+ * 1. Find referrer
+ * 2. Check if referrer is active agent
+ * 3. Calculate commission
+ * 4. Update Agent Profile (Income & Balance)
+ * 5. Update Agent Record (Daily/Month stats)
+ */
+export async function processOrderCommission(
+    userId: string,
+    orderAmount: number, // in cents
+    orderType: 'membership' | 'coin',
+    explicitAgentId?: string | null
+): Promise<void> {
+    // Dynamic imports to avoid circular dependencies
+    const { getAgentProfile } = await import('./agent-profile.service');
+    const { UserRepository } = await import('@/repositories/user.repository');
+    const { AgentProfileRepository } = await import('@/repositories/agent-profile.repository');
+
+    const userRepository = new UserRepository();
+    const agentProfileRepository = new AgentProfileRepository();
+
+    // 1. Identify Referrer (Agent)
+    let referrerId: string | null | undefined = explicitAgentId;
+
+    if (!referrerId) {
+        const user = await userRepository.findById(userId);
+        referrerId = user?.referredBy;
+    }
+
+    if (!referrerId) {
+        return; // No referrer, no commission
+    }
+
+    // Prevent self-commission
+    if (referrerId === userId) {
+        return;
+    }
+
+    // 2. Check Agent Status
+    const agentProfile = await getAgentProfile(referrerId);
+    if (!agentProfile || agentProfile.status !== 'active') {
+        return; // Referrer is not an active agent
+    }
+
+    // 3. Calculate Commission
+    const level = await getAgentLevelById(agentProfile.levelId);
+    if (!level) return;
+
+    // commissionRate 1000 = 10%
+    const commissionAmount = Math.floor(orderAmount * level.commissionRate / 10000);
+    if (commissionAmount <= 0) return;
+
+    // 4. Update Profile Income
+    await agentProfileRepository.addIncome(referrerId, commissionAmount);
+
+    // 5. Update/Create Monthly Record
+    const month = getCurrentMonth();
+    const existingRecord = await agentRecordRepository.findByUserIdAndMonth(referrerId, month);
+
+    if (existingRecord) {
+        // Update existing record
+        // Note: We need to be careful not to overwrite accumulated values if we use updateAgentRecord which recalculates based on totalSales
+        // But here we are incrementing.
+        // Let's use simpler update or ensure we have correct totalSales.
+        // Actually updateAgentRecord recalculates earnings based on TOTAL sales.
+        // So we should fetch current, add new amount, and let it recalculate.
+
+        const newTotalSales = existingRecord.totalSales + Math.floor(orderAmount / 100);
+
+        await updateAgentRecord(existingRecord.id, {
+            totalSales: newTotalSales,
+            // The service will automatically recalculate commissionAmount, bonusAmount, totalEarnings based on newTotalSales and current Level
+        });
+    } else {
+        // Create new record
+        const salesInYuan = Math.floor(orderAmount / 100);
+        await createAgentRecord({
+            agentName: agentProfile.realName || 'Agent',
+            agentContact: agentProfile.contact || '',
+            levelId: agentProfile.levelId,
+            month,
+            recruitCount: 0,
+            dailySales: 0,
+            totalSales: salesInYuan,
+            userId: referrerId,
+            status: 'pending',
+        });
+    }
+}
+
+/**
+ * Track new recruit for agent
+ */
+export async function trackRecruit(inviterId: string): Promise<void> {
+    const { getAgentProfile } = await import('./agent-profile.service');
+    // Check if inviter is active agent
+    const agentProfile = await getAgentProfile(inviterId);
+    if (!agentProfile || agentProfile.status !== 'active') return;
+
+    const month = getCurrentMonth();
+    const existingRecord = await agentRecordRepository.findByUserIdAndMonth(inviterId, month);
+
+    if (existingRecord) {
+        await agentRecordRepository.update(existingRecord.id, {
+            recruitCount: existingRecord.recruitCount + 1
+        });
+    } else {
+        // Create new record
+        await createAgentRecord({
+            agentName: agentProfile.realName || 'Agent',
+            agentContact: agentProfile.contact || '',
+            levelId: agentProfile.levelId,
+            month,
+            recruitCount: 1,
+            dailySales: 0,
+            totalSales: 0,
+            userId: inviterId,
+            status: 'pending',
+        });
+    }
+}
