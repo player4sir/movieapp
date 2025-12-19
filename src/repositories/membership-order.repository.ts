@@ -32,7 +32,7 @@ export interface UpdateMembershipOrderInput {
 export interface OrderListParams {
   page?: number;
   pageSize?: number;
-  status?: 'pending' | 'paid' | 'approved' | 'rejected';
+  status?: ('pending' | 'paid' | 'approved' | 'rejected') | ('pending' | 'paid' | 'approved' | 'rejected')[];
   userId?: string;
   sortBy?: 'createdAt' | 'updatedAt';
   sortOrder?: 'asc' | 'desc';
@@ -251,7 +251,14 @@ export class MembershipOrderRepository extends BaseRepository {
       const conditions = [];
 
       if (status) {
-        conditions.push(eq(membershipOrders.status, status));
+        if (Array.isArray(status)) {
+          // Multi-status filter using IN clause
+          conditions.push(
+            sql`${membershipOrders.status} IN (${sql.join(status.map(s => sql`${s}`), sql`, `)})`
+          );
+        } else {
+          conditions.push(eq(membershipOrders.status, status));
+        }
       }
       if (userId) {
         conditions.push(eq(membershipOrders.userId, userId));
@@ -296,6 +303,18 @@ export class MembershipOrderRepository extends BaseRepository {
       };
     } catch (error) {
       throw new RepositoryError('Failed to list membership orders', 'LIST_ERROR', error);
+    }
+  }
+
+  /**
+   * Delete an order by ID.
+   * Used when rejecting orders - no need to keep unpaid rejected orders.
+   */
+  async delete(id: string): Promise<void> {
+    try {
+      await this.db.delete(membershipOrders).where(eq(membershipOrders.id, id));
+    } catch (error) {
+      throw new RepositoryError('Failed to delete membership order', 'DELETE_ERROR', error);
     }
   }
 }

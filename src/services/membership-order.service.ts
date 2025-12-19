@@ -261,15 +261,16 @@ export async function approveOrder(
 }
 
 /**
- * Admin: Reject an order with reason.
+ * Admin: Reject and delete an order.
+ * Since rejected orders have no payment, they are deleted to keep database clean.
  * 
  * Requirements: 6.3
  */
 export async function rejectOrder(
   orderId: string,
-  adminId: string,
-  reason: string
-): Promise<MembershipOrder> {
+  _adminId: string,
+  _reason: string
+): Promise<{ deleted: true }> {
   const order = await membershipOrderRepository.findById(orderId);
 
   if (!order) {
@@ -281,23 +282,10 @@ export async function rejectOrder(
     throw { ...ORDER_ERRORS.ORDER_ALREADY_PROCESSED };
   }
 
-  // Use conditional update to prevent race condition
-  const updatedOrder = await membershipOrderRepository.updateWithCondition(
-    orderId,
-    { status: ['pending', 'paid'] },
-    {
-      status: 'rejected',
-      reviewedBy: adminId,
-      reviewedAt: new Date(),
-      rejectReason: reason,
-    }
-  );
+  // Delete the order - no payment was made, no need to keep record
+  await membershipOrderRepository.delete(orderId);
 
-  if (!updatedOrder) {
-    throw { ...ORDER_ERRORS.ORDER_ALREADY_PROCESSED };
-  }
-
-  return updatedOrder;
+  return { deleted: true };
 }
 
 /**

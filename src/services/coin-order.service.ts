@@ -176,7 +176,15 @@ export async function approveCoinOrder(orderId: string, adminId: string) {
     return updatedOrder;
 }
 
-export async function rejectCoinOrder(orderId: string, adminId: string, reason: string) {
+/**
+ * Admin: Reject and delete a coin order.
+ * Since rejected orders have no payment, they are deleted to keep database clean.
+ */
+export async function rejectCoinOrder(
+    orderId: string,
+    _adminId: string,
+    _reason: string
+): Promise<{ deleted: true }> {
     const order = await coinOrderRepository.findById(orderId);
     if (!order) throw { ...COIN_ORDER_ERRORS.ORDER_NOT_FOUND };
 
@@ -184,21 +192,9 @@ export async function rejectCoinOrder(orderId: string, adminId: string, reason: 
         throw { ...COIN_ORDER_ERRORS.ORDER_ALREADY_PROCESSED };
     }
 
-    // Use conditional update to prevent race condition
-    const updatedOrder = await coinOrderRepository.updateWithCondition(
-        orderId,
-        { status: ['pending', 'paid'] },
-        {
-            status: 'rejected',
-            reviewedBy: adminId,
-            reviewedAt: new Date(),
-            rejectReason: reason,
-        }
-    );
+    // Delete the order - no payment was made, no need to keep record
+    await coinOrderRepository.delete(orderId);
 
-    if (!updatedOrder) {
-        throw { ...COIN_ORDER_ERRORS.ORDER_ALREADY_PROCESSED };
-    }
-
-    return updatedOrder;
+    return { deleted: true };
 }
+

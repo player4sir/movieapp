@@ -99,7 +99,7 @@ export class CoinOrderRepository extends BaseRepository {
 
     async list(params: PaginationParams & {
         userId?: string;
-        status?: 'pending' | 'paid' | 'approved' | 'rejected';
+        status?: ('pending' | 'paid' | 'approved' | 'rejected') | ('pending' | 'paid' | 'approved' | 'rejected')[];
         orderNo?: string;
     }): Promise<PaginationResult<CoinOrder>> {
         const conditions = [];
@@ -109,7 +109,14 @@ export class CoinOrderRepository extends BaseRepository {
         }
 
         if (params.status) {
-            conditions.push(eq(coinOrders.status, params.status));
+            if (Array.isArray(params.status)) {
+                // Multi-status filter using IN clause
+                conditions.push(
+                    sql`${coinOrders.status} IN (${sql.join(params.status.map(s => sql`${s}`), sql`, `)})`
+                );
+            } else {
+                conditions.push(eq(coinOrders.status, params.status));
+            }
         }
 
         if (params.orderNo) {
@@ -144,5 +151,13 @@ export class CoinOrderRepository extends BaseRepository {
                 totalPages: Math.ceil(Number(countResult.count) / params.pageSize),
             },
         };
+    }
+
+    /**
+     * Delete an order by ID.
+     * Used when rejecting orders - no need to keep unpaid rejected orders.
+     */
+    async delete(id: string): Promise<void> {
+        await this.db.delete(coinOrders).where(eq(coinOrders.id, id));
     }
 }

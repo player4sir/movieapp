@@ -77,7 +77,7 @@ export function OrdersStatsCard({ getAccessToken }: OrdersStatsCardProps) {
             <div className="grid grid-cols-2 gap-4">
                 {/* Membership Orders */}
                 <Link
-                    href="/console-x9k2m/membership"
+                    href="/console-x9k2m/orders"
                     className="p-4 rounded-xl bg-background/50 hover:bg-background/80 transition-colors group"
                 >
                     <div className="flex items-center justify-between mb-2">
@@ -100,7 +100,7 @@ export function OrdersStatsCard({ getAccessToken }: OrdersStatsCardProps) {
 
                 {/* Coin Orders */}
                 <Link
-                    href="/console-x9k2m/settings/coins"
+                    href="/console-x9k2m/orders"
                     className="p-4 rounded-xl bg-background/50 hover:bg-background/80 transition-colors group"
                 >
                     <div className="flex items-center justify-between mb-2">

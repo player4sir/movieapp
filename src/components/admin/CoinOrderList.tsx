@@ -93,7 +93,10 @@ export function CoinOrderList({
                 sortBy: 'createdAt',
                 sortOrder: 'desc',
             });
-            if (statusFilter) {
+            // When '新订单' is selected (empty filter), request pending+paid orders from server
+            if (statusFilter === '') {
+                params.set('status', 'pending,paid');
+            } else {
                 params.set('status', statusFilter);
             }
 
@@ -139,7 +142,7 @@ export function CoinOrderList({
 
     return (
         <div className="space-y-4">
-            {/* Status Filter */}
+            {/* Status Filter - Simplified */}
             <div className="flex gap-2 overflow-x-auto pb-2">
                 <button
                     onClick={() => handleStatusFilterChange('')}
@@ -148,20 +151,17 @@ export function CoinOrderList({
                         : 'bg-surface text-foreground/70 hover:bg-surface-secondary'
                         }`}
                 >
-                    全部
+                    新订单
                 </button>
-                {(Object.keys(STATUS_CONFIG) as OrderStatus[]).map(status => (
-                    <button
-                        key={status}
-                        onClick={() => handleStatusFilterChange(status)}
-                        className={`px-4 py-2 text-sm rounded-lg whitespace-nowrap transition-colors ${statusFilter === status
-                            ? 'bg-primary text-white'
-                            : 'bg-surface text-foreground/70 hover:bg-surface-secondary'
-                            }`}
-                    >
-                        {STATUS_CONFIG[status].label}
-                    </button>
-                ))}
+                <button
+                    onClick={() => handleStatusFilterChange('approved')}
+                    className={`px-4 py-2 text-sm rounded-lg whitespace-nowrap transition-colors ${statusFilter === 'approved'
+                        ? 'bg-primary text-white'
+                        : 'bg-surface text-foreground/70 hover:bg-surface-secondary'
+                        }`}
+                >
+                    已通过
+                </button>
             </div>
 
             {/* Empty State */}

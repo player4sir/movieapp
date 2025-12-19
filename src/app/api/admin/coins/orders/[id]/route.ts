@@ -22,9 +22,10 @@ export async function PUT(
             );
         }
 
-        let updatedOrder;
+        let result;
         if (action === 'approve') {
-            updatedOrder = await approveCoinOrder(id, admin.id);
+            result = await approveCoinOrder(id, admin.id);
+            return NextResponse.json({ order: result });
         } else {
             if (!reason) {
                 return NextResponse.json(
@@ -32,10 +33,9 @@ export async function PUT(
                     { status: 400 }
                 );
             }
-            updatedOrder = await rejectCoinOrder(id, admin.id, reason);
+            await rejectCoinOrder(id, admin.id, reason);
+            return NextResponse.json({ deleted: true, message: '订单已删除' });
         }
-
-        return NextResponse.json({ order: updatedOrder });
     } catch (error: unknown) {
         // Keeping 'any' temporarily or asserting specific type if known.
         // Better: cast to a known AppError type or use unknown.

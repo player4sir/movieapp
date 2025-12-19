@@ -13,19 +13,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, isAuthError } from '@/lib/auth-middleware';
 import { UserRepository, UserGroupRepository } from '@/repositories';
-import { calculateEffectivePermissions, parseGroupPermissions } from '@/services/permission.service';
+import { calculateEffectivePermissions, parseGroupPermissions, isMembershipExpired } from '@/services/permission.service';
 
 // Repository instances
 const userRepository = new UserRepository();
 const groupRepository = new UserGroupRepository();
-
-/**
- * Check if membership is still active (for user's own membership, not group-granted)
- */
-function isMembershipActive(memberExpiry: Date | null): boolean {
-  if (!memberExpiry) return false;
-  return new Date(memberExpiry) > new Date();
-}
 
 export async function GET(request: NextRequest) {
   const authResult = await requireAuth(request);
@@ -76,7 +68,7 @@ export async function GET(request: NextRequest) {
     // - Group-granted memberships are always active (no expiry)
     // - User's own membership requires valid expiry
     const hasGroupMembershipOverride = !!groupPermissions?.memberLevel;
-    const isUserMembershipActive = isMembershipActive(userData.memberExpiry);
+    const isUserMembershipActive = !isMembershipExpired(userData.memberExpiry);
     const isEffectiveMembershipActive = hasGroupMembershipOverride || isUserMembershipActive;
 
     // Determine tier based on effective memberLevel and active status

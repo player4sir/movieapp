@@ -92,22 +92,22 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         message: '订单已通过，会员已激活',
       });
     } else {
-      const order = await rejectOrder(id, adminId, reason);
+      await rejectOrder(id, adminId, reason);
       return NextResponse.json({
-        data: order,
-        message: '订单已拒绝',
+        deleted: true,
+        message: '订单已删除',
       });
     }
   } catch (error: unknown) {
     const err = error as { code?: string; message?: string };
-    
+
     if (err.code === ORDER_ERRORS.ORDER_NOT_FOUND.code) {
       return NextResponse.json(
         { code: err.code, message: err.message },
         { status: 404 }
       );
     }
-    
+
     if (err.code === ORDER_ERRORS.ORDER_ALREADY_PROCESSED.code) {
       return NextResponse.json(
         { code: err.code, message: err.message },

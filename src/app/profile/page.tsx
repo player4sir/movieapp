@@ -65,7 +65,7 @@ interface MembershipData {
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { user, isAuthenticated, loading, logout } = useAuth();
+  const { user, isAuthenticated, loading, logout, getAccessToken } = useAuth();
   const { balance, checkinStatus, performCheckin, checkinLoading } = useCoins();
 
   const [showRecharge, setShowRecharge] = useState(false);
@@ -79,7 +79,10 @@ export default function ProfilePage() {
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    fetch('/api/user/subscription')
+    const token = getAccessToken();
+    fetch('/api/user/subscription', {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    })
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data) {
@@ -91,17 +94,18 @@ export default function ProfilePage() {
             daysRemaining = Math.max(0, Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
           }
 
-          setMembership({
+          const membershipData = {
             memberLevel: data.memberLevel || 'free',
             memberExpiry: data.expiresAt,
             isActive: data.isVip || data.isSvip || data.tier === 'admin',
             daysRemaining,
             isFromGroup: data.permissionSource === 'group', // 来自用户组
-          });
+          };
+          setMembership(membershipData);
         }
       })
       .catch(() => { });
-  }, [isAuthenticated]);
+  }, [isAuthenticated, getAccessToken]);
 
   // Redirect if not authenticated
   useEffect(() => {

@@ -59,8 +59,6 @@ export function CoinOrderReviewModal({
     onSuccess,
     onShowToast,
 }: CoinOrderReviewModalProps) {
-    const [rejectReason, setRejectReason] = useState('');
-    const [showRejectForm, setShowRejectForm] = useState(false);
     const [processing, setProcessing] = useState(false);
 
     const showToast = useCallback((message: string, type: 'success' | 'error') => {
@@ -102,10 +100,6 @@ export function CoinOrderReviewModal({
 
     const handleReject = useCallback(async () => {
         if (!order) return;
-        if (!rejectReason.trim()) {
-            showToast('请输入拒绝原因', 'error');
-            return;
-        }
 
         const token = getAccessToken();
         if (!token) return;
@@ -118,38 +112,30 @@ export function CoinOrderReviewModal({
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${token}`,
                 },
-                body: JSON.stringify({ action: 'reject', reason: rejectReason.trim() }),
+                body: JSON.stringify({ action: 'reject', reason: '订单无效' }),
             });
 
             if (!response.ok) {
                 const data = await response.json();
-                throw new Error(data.message || '拒绝失败');
+                throw new Error(data.message || '删除失败');
             }
 
-            showToast('订单已拒绝', 'success');
-            setRejectReason('');
-            setShowRejectForm(false);
+            showToast('订单已删除', 'success');
             onSuccess?.();
             onClose();
         } catch (err) {
-            showToast(err instanceof Error ? err.message : '拒绝失败', 'error');
+            showToast(err instanceof Error ? err.message : '删除失败', 'error');
         } finally {
             setProcessing(false);
         }
-    }, [order, rejectReason, getAccessToken, showToast, onSuccess, onClose]);
-
-    const handleClose = () => {
-        setRejectReason('');
-        setShowRejectForm(false);
-        onClose();
-    };
+    }, [order, getAccessToken, showToast, onSuccess, onClose]);
 
     if (!isOpen || !order) return null;
 
     return (
         <div
             className="fixed inset-0 bg-black/50 flex items-end lg:items-center justify-center z-50"
-            onClick={handleClose}
+            onClick={onClose}
         >
             <div
                 className="bg-background rounded-t-xl lg:rounded-lg w-full lg:max-w-lg max-h-[85vh] overflow-hidden flex flex-col"
@@ -158,7 +144,7 @@ export function CoinOrderReviewModal({
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b border-surface-secondary">
                     <h2 className="text-lg font-semibold">审核充值订单</h2>
-                    <button onClick={handleClose} className="p-1 text-foreground/50 hover:text-foreground">
+                    <button onClick={onClose} className="p-1 text-foreground/50 hover:text-foreground">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
@@ -199,9 +185,7 @@ export function CoinOrderReviewModal({
                             </div>
                             <div>
                                 <span className="text-foreground/50">支付方式</span>
-                                <p>
-                                    康讯支付
-                                </p>
+                                <p>康讯支付</p>
                             </div>
                             <div>
                                 <span className="text-foreground/50">下单时间</span>
@@ -229,64 +213,29 @@ export function CoinOrderReviewModal({
                             />
                         </div>
                     )}
-
-                    {/* Reject Form */}
-                    {showRejectForm && (
-                        <div className="bg-surface rounded-lg p-4">
-                            <p className="text-sm text-foreground/50 mb-2">拒绝原因</p>
-                            <textarea
-                                value={rejectReason}
-                                onChange={(e) => setRejectReason(e.target.value)}
-                                placeholder="请输入拒绝原因..."
-                                className="w-full px-3 py-2 bg-background border border-surface-secondary rounded-lg text-sm resize-none"
-                                rows={3}
-                            />
-                        </div>
-                    )}
                 </div>
 
-                {/* Actions */}
-                <div className="p-4 border-t border-surface-secondary space-y-2">
-                    {!showRejectForm ? (
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setShowRejectForm(true)}
-                                disabled={processing}
-                                className="flex-1 py-3 text-sm font-medium text-red-500 border border-red-500/30 rounded-lg hover:bg-red-500/10 disabled:opacity-50 transition-colors"
-                            >
-                                拒绝
-                            </button>
-                            <button
-                                onClick={handleApprove}
-                                disabled={processing}
-                                className="flex-1 py-3 text-sm font-medium bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 transition-colors"
-                            >
-                                {processing ? '处理中...' : '通过'}
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => {
-                                    setShowRejectForm(false);
-                                    setRejectReason('');
-                                }}
-                                disabled={processing}
-                                className="flex-1 py-3 text-sm font-medium text-foreground/70 border border-surface-secondary rounded-lg hover:bg-surface-secondary disabled:opacity-50 transition-colors"
-                            >
-                                取消
-                            </button>
-                            <button
-                                onClick={handleReject}
-                                disabled={processing || !rejectReason.trim()}
-                                className="flex-1 py-3 text-sm font-medium bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 transition-colors"
-                            >
-                                {processing ? '处理中...' : '确认拒绝'}
-                            </button>
-                        </div>
-                    )}
+                {/* Actions - Simplified: Direct approve/delete without confirmation */}
+                <div className="p-4 border-t border-surface-secondary">
+                    <div className="flex gap-3">
+                        <button
+                            onClick={handleReject}
+                            disabled={processing}
+                            className="flex-1 py-3 text-sm font-medium text-red-500 border border-red-500/30 rounded-lg hover:bg-red-500/10 disabled:opacity-50 transition-colors"
+                        >
+                            {processing ? '处理中...' : '删除'}
+                        </button>
+                        <button
+                            onClick={handleApprove}
+                            disabled={processing}
+                            className="flex-1 py-3 text-sm font-medium bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 transition-colors"
+                        >
+                            {processing ? '处理中...' : '通过'}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
     );
 }
+

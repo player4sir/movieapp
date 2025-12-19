@@ -82,8 +82,9 @@ export function calculateEffectivePermissions(
   user: UserPermissionData,
   groupPermissions?: GroupPermissions | null
 ): EffectivePermissions {
-  // Start with user's member level
-  const userMemberLevel = user.memberLevel;
+  // Get effective member level considering expiry
+  // (expired memberships will return 'free')
+  const userMemberLevel = getEffectiveMemberLevel(user.memberLevel, user.memberExpiry);
 
   // Get base permissions from user's member level
   const basePermissions = MEMBER_LEVEL_DEFAULTS[userMemberLevel];
@@ -127,11 +128,11 @@ export function calculateEffectivePermissions(
  * Checks if a user's membership has expired
  * 
  * @param memberExpiry - The membership expiry date
- * @returns true if membership has expired, false otherwise
+ * @returns true if membership has expired or is null (no valid membership), false if still active
  */
 export function isMembershipExpired(memberExpiry: Date | null | undefined): boolean {
   if (!memberExpiry) {
-    return false; // No expiry means never expires
+    return true; // No expiry date means no valid membership
   }
   return new Date() > new Date(memberExpiry);
 }

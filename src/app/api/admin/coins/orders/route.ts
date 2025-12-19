@@ -12,9 +12,17 @@ export async function GET(request: NextRequest) {
         const { searchParams } = new URL(request.url);
         const page = parseInt(searchParams.get('page') || '1', 10);
         const pageSize = parseInt(searchParams.get('pageSize') || '20', 10);
-        // Type cast acceptable for search params, repository layer will handle filtering
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const status = (searchParams.get('status') || undefined) as any;
+        const statusParam = searchParams.get('status');
+
+        // Support comma-separated status values (e.g., "pending,paid")
+        type OrderStatus = 'pending' | 'paid' | 'approved' | 'rejected';
+        const validStatuses: OrderStatus[] = ['pending', 'paid', 'approved', 'rejected'];
+        let status: OrderStatus | OrderStatus[] | undefined;
+
+        if (statusParam) {
+            const statusArray = statusParam.split(',').filter(s => validStatuses.includes(s as OrderStatus)) as OrderStatus[];
+            status = statusArray.length === 1 ? statusArray[0] : statusArray.length > 1 ? statusArray : undefined;
+        }
 
         const result = await coinOrderRepository.list({
             page,
