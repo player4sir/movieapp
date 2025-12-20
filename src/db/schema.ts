@@ -682,6 +682,23 @@ export const settlementRecords = pgTable('SettlementRecord', {
   index('SettlementRecord_createdAt_idx').on(table.createdAt),
 ]);
 
+// Agent Level Change Log Table - tracks all level changes for audit
+export const agentLevelChangeLogs = pgTable('AgentLevelChangeLog', {
+  id: text('id').primaryKey(),
+  userId: text('userId').notNull(),              // 代理商用户ID
+  previousLevelId: text('previousLevelId'),      // 变更前等级ID（可为空表示新建）
+  previousLevelName: varchar('previousLevelName', { length: 50 }), // 变更前等级名称快照
+  newLevelId: text('newLevelId').notNull(),      // 变更后等级ID
+  newLevelName: varchar('newLevelName', { length: 50 }).notNull(), // 变更后等级名称快照
+  changeType: varchar('changeType', { length: 20 }).notNull(), // 'manual' | 'auto_upgrade' | 'initial'
+  changedBy: text('changedBy'),                  // 操作人ID（管理员或 null 表示系统自动）
+  reason: text('reason'),                        // 变更原因
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+}, (table) => [
+  index('AgentLevelChangeLog_userId_idx').on(table.userId),
+  index('AgentLevelChangeLog_createdAt_idx').on(table.createdAt),
+]);
+
 // Agent System Relations
 export const agentProfilesRelations = relations(agentProfiles, ({ one, many }) => ({
   user: one(users, {
@@ -769,11 +786,13 @@ export type AgentLevel = InferSelectModel<typeof agentLevels>;
 export type AgentRecord = InferSelectModel<typeof agentRecords>;
 export type AgentProfile = InferSelectModel<typeof agentProfiles>;
 export type SettlementRecord = InferSelectModel<typeof settlementRecords>;
+export type AgentLevelChangeLog = InferSelectModel<typeof agentLevelChangeLogs>;
 
 export type NewAgentLevel = InferInsertModel<typeof agentLevels>;
 export type NewAgentRecord = InferInsertModel<typeof agentRecords>;
 export type NewAgentProfile = InferInsertModel<typeof agentProfiles>;
 export type NewSettlementRecord = InferInsertModel<typeof settlementRecords>;
+export type NewAgentLevelChangeLog = InferInsertModel<typeof agentLevelChangeLogs>;
 
 // Rotation strategy enum values
 export type RotationStrategy = 'random' | 'sequential';
@@ -825,4 +844,5 @@ export const allTables = {
   agentRecords,
   agentProfiles,
   settlementRecords,
+  agentLevelChangeLogs,
 };

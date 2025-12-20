@@ -59,6 +59,62 @@ export function RechargeModal({ isOpen, onClose, currentBalance = 0, onSuccess }
       fetchPackages();
       fetchQRCodes();
       resetState();
+
+      // Auto-fill agent code from localStorage if available
+      // This enables tracking even when user didn't use the agent link to register
+      // Codes expire after 30 days to ensure fair attribution
+      const TRACKING_EXPIRY_DAYS = 30;
+      const now = Date.now();
+
+      // Check agent code with expiry
+      const agentCodeData = localStorage.getItem('agentCodeData');
+      let validAgentCode: string | null = null;
+      if (agentCodeData) {
+        try {
+          const { code, timestamp } = JSON.parse(agentCodeData);
+          const expiryTime = timestamp + TRACKING_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+          if (now < expiryTime) {
+            validAgentCode = code;
+          } else {
+            localStorage.removeItem('agentCodeData');
+            localStorage.removeItem('agentCode');
+          }
+        } catch {
+          localStorage.removeItem('agentCodeData');
+        }
+      }
+
+      // Check referral code with expiry
+      const referralCodeData = localStorage.getItem('referralCodeData');
+      let validReferralCode: string | null = null;
+      if (referralCodeData) {
+        try {
+          const { code, timestamp } = JSON.parse(referralCodeData);
+          const expiryTime = timestamp + TRACKING_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+          if (now < expiryTime) {
+            validReferralCode = code;
+          } else {
+            localStorage.removeItem('referralCodeData');
+            localStorage.removeItem('referralCode');
+          }
+        } catch {
+          localStorage.removeItem('referralCodeData');
+        }
+      }
+
+      // Fallback to old format (without timestamp) for backward compatibility
+      const legacyAgentCode = localStorage.getItem('agentCode');
+      const legacyReferralCode = localStorage.getItem('referralCode');
+
+      if (validAgentCode) {
+        setAgentCode(validAgentCode);
+      } else if (validReferralCode) {
+        setAgentCode(validReferralCode);
+      } else if (legacyAgentCode) {
+        setAgentCode(legacyAgentCode);
+      } else if (legacyReferralCode) {
+        setAgentCode(legacyReferralCode);
+      }
     }
   }, [isOpen]);
 

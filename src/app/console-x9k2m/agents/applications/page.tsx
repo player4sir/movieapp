@@ -188,12 +188,20 @@ export default function AgentApplicationsPage() {
                                                 </button>
                                             </div>
                                         ) : (
-                                            <button
-                                                onClick={() => handleEdit(p)}
-                                                className="text-primary hover:underline text-xs"
-                                            >
-                                                编辑
-                                            </button>
+                                            <div className="flex justify-end gap-2">
+                                                <a
+                                                    href={`/console-x9k2m/agents/detail/${p.userId}`}
+                                                    className="text-foreground/60 hover:text-primary text-xs"
+                                                >
+                                                    详情
+                                                </a>
+                                                <button
+                                                    onClick={() => handleEdit(p)}
+                                                    className="text-primary hover:underline text-xs"
+                                                >
+                                                    编辑
+                                                </button>
+                                            </div>
                                         )}
                                     </td>
                                 </tr>

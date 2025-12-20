@@ -29,21 +29,37 @@ export async function POST(request: NextRequest) {
         }
 
         // Resolve agent code if provided
+        // Agent codes start with 'A' and are 8 chars (stored in agentProfiles)
+        // Regular referral codes are 6 chars (stored in users.referralCode)
         let agentId: string | undefined;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if ((body as any).agentCode) {
+        if (body.agentCode) {
             const { db } = await import('@/db');
-            const { users } = await import('@/db/schema');
+            const { users, agentProfiles } = await import('@/db/schema');
             const { eq } = await import('drizzle-orm');
 
-            const agent = await db.query.users.findFirst({
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                where: eq(users.referralCode, (body as any).agentCode),
-                columns: { id: true }
-            });
+            const code = String(body.agentCode).trim().toUpperCase();
+            const isAgentCode = code.startsWith('A') && code.length === 8;
 
-            if (agent) {
-                agentId = agent.id;
+            if (isAgentCode) {
+                // Look for agent promotion code in agentProfiles table
+                const agentProfile = await db.query.agentProfiles.findFirst({
+                    where: eq(agentProfiles.agentCode, code),
+                    columns: { userId: true, status: true }
+                });
+
+                if (agentProfile?.status === 'active') {
+                    agentId = agentProfile.userId;
+                }
+            } else {
+                // Fall back to regular user referral code
+                const agent = await db.query.users.findFirst({
+                    where: eq(users.referralCode, code),
+                    columns: { id: true }
+                });
+
+                if (agent) {
+                    agentId = agent.id;
+                }
             }
         }
 

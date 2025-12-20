@@ -64,20 +64,61 @@ function RegisterPageContent() {
     // Support 'ref' (user referral), 'invite', and 'agent' (agent promotion) parameters
     const codeFromUrl = searchParams.get('ref') || searchParams.get('invite');
     const agentCode = searchParams.get('agent');
-    const codeFromStorage = localStorage.getItem('referralCode');
-    const agentFromStorage = localStorage.getItem('agentCode');
+
+    // Helper to save code with timestamp for 30-day expiry
+    const saveCodeWithTimestamp = (key: string, code: string) => {
+      localStorage.setItem(key, code);
+      localStorage.setItem(`${key}Data`, JSON.stringify({
+        code,
+        timestamp: Date.now(),
+      }));
+    };
 
     // Agent code takes precedence
     if (agentCode) {
       setInviteCode(agentCode);
-      localStorage.setItem('agentCode', agentCode);
-    } else if (agentFromStorage) {
-      setInviteCode(agentFromStorage);
+      saveCodeWithTimestamp('agentCode', agentCode);
     } else if (codeFromUrl) {
       setInviteCode(codeFromUrl);
-      localStorage.setItem('referralCode', codeFromUrl);
-    } else if (codeFromStorage) {
-      setInviteCode(codeFromStorage);
+      saveCodeWithTimestamp('referralCode', codeFromUrl);
+    } else {
+      // Try to restore from localStorage (check new format first, then legacy)
+      const agentCodeData = localStorage.getItem('agentCodeData');
+      const referralCodeData = localStorage.getItem('referralCodeData');
+      const legacyAgentCode = localStorage.getItem('agentCode');
+      const legacyReferralCode = localStorage.getItem('referralCode');
+
+      const TRACKING_EXPIRY_DAYS = 30;
+      const now = Date.now();
+
+      // Check agent code
+      if (agentCodeData) {
+        try {
+          const { code, timestamp } = JSON.parse(agentCodeData);
+          if (now < timestamp + TRACKING_EXPIRY_DAYS * 24 * 60 * 60 * 1000) {
+            setInviteCode(code);
+            return;
+          }
+        } catch { /* ignore */ }
+      }
+
+      // Check referral code
+      if (referralCodeData) {
+        try {
+          const { code, timestamp } = JSON.parse(referralCodeData);
+          if (now < timestamp + TRACKING_EXPIRY_DAYS * 24 * 60 * 60 * 1000) {
+            setInviteCode(code);
+            return;
+          }
+        } catch { /* ignore */ }
+      }
+
+      // Fallback to legacy format
+      if (legacyAgentCode) {
+        setInviteCode(legacyAgentCode);
+      } else if (legacyReferralCode) {
+        setInviteCode(legacyReferralCode);
+      }
     }
   }, [isAuthenticated, authLoading, router, searchParams]);
 

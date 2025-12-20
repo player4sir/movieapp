@@ -487,41 +487,6 @@ export default function AgentCenterPage() {
                                         </div>
                                     </div>
 
-                                    {/* Payment Info Card */}
-                                    <div className="bg-surface rounded-2xl p-4 lg:p-5">
-                                        <div className="flex items-center justify-between mb-4">
-                                            <h3 className="font-bold">收款信息</h3>
-                                            <button
-                                                onClick={() => setShowSettingsModal(true)}
-                                                className="text-sm text-primary hover:underline"
-                                            >
-                                                {profile.paymentAccount ? '修改' : '去设置'}
-                                            </button>
-                                        </div>
-                                        {profile.paymentAccount ? (
-                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                                <div className="p-3 bg-background rounded-xl">
-                                                    <div className="text-xs text-foreground/50 mb-1">真实姓名</div>
-                                                    <div className="font-medium truncate">{profile.realName}</div>
-                                                </div>
-                                                <div className="p-3 bg-background rounded-xl">
-                                                    <div className="text-xs text-foreground/50 mb-1">收款方式</div>
-                                                    <div className="font-medium">{getPaymentMethodLabel(profile.paymentMethod || '')}</div>
-                                                </div>
-                                                <div className="p-3 bg-background rounded-xl">
-                                                    <div className="text-xs text-foreground/50 mb-1">收款账号</div>
-                                                    <div className="font-medium truncate">{profile.paymentAccount}</div>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <div className="text-center py-6 text-foreground/40">
-                                                <Settings className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                                                <p className="text-sm">暂未设置收款账户</p>
-                                                <p className="text-xs mt-1">请设置后再申请结算</p>
-                                            </div>
-                                        )}
-                                    </div>
-
                                     {/* Historical Records */}
                                     {stats && stats.history.length > 0 && (
                                         <div className="bg-surface rounded-2xl p-4 lg:p-5">

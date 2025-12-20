@@ -401,6 +401,14 @@ export async function processOrderCommission(
             status: 'pending',
         });
     }
+
+    // 6. Check for level upgrade after commission processing
+    try {
+        const { checkAndUpgradeLevel } = await import('./agent-profile.service');
+        await checkAndUpgradeLevel(referrerId);
+    } catch (error) {
+        console.error('Failed to check agent level upgrade:', error);
+    }
 }
 
 /**
