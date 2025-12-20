@@ -12,7 +12,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/hooks';
+import { useAuth, useSiteSettings } from '@/hooks';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { BottomNav } from '@/components/layout/BottomNav';
 import {
@@ -27,7 +27,7 @@ import {
     Users,
     QrCode
 } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
+import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
 import Link from 'next/link';
 
 interface AgentShareData {
@@ -48,7 +48,10 @@ export default function AgentSharePage() {
     const [error, setError] = useState<string | null>(null);
     const [copied, setCopied] = useState<'code' | 'link' | null>(null);
     const [generatingPoster, setGeneratingPoster] = useState(false);
+    const { settings } = useSiteSettings();
     const posterRef = useRef<HTMLDivElement>(null);
+
+    const siteName = settings?.site_name || '影视平台';
 
     const headers = useCallback((): Record<string, string> => {
         const token = getAccessToken();
@@ -98,19 +101,42 @@ export default function AgentSharePage() {
 
         setGeneratingPoster(true);
         try {
+            // First, get QR code as data URL from the visible/hidden-but-rendered canvas
+            const qrCanvas = document.querySelector('#poster-qr-canvas canvas') as HTMLCanvasElement;
+            if (qrCanvas) {
+                const qrDataUrl = qrCanvas.toDataURL('image/png');
+                // Set the poster QR image src
+                const posterQrImg = document.getElementById('poster-qr-img') as HTMLImageElement;
+                if (posterQrImg) {
+                    posterQrImg.src = qrDataUrl;
+
+                    // Wait for image to load and be ready in the DOM
+                    await new Promise((resolve, reject) => {
+                        if (posterQrImg.complete) resolve(true);
+                        posterQrImg.onload = () => resolve(true);
+                        posterQrImg.onerror = reject;
+                        // Safety timeout
+                        setTimeout(() => resolve(true), 500);
+                    });
+                }
+            }
+
             // Dynamic import html2canvas
             const html2canvas = (await import('html2canvas')).default;
 
             const canvas = await html2canvas(posterRef.current, {
-                backgroundColor: '#0f0f0f',
-                scale: 2,
                 useCORS: true,
+                scale: 3, // Higher scale for better quality
+                backgroundColor: '#ffffff',
+                logging: false,
+                width: 375,
+                height: 667,
             });
 
             // Convert to image and download
             const link = document.createElement('a');
-            link.download = `agent-poster-${data?.agentCode || 'share'}.png`;
-            link.href = canvas.toDataURL('image/png');
+            link.download = `agent-share-${data?.agentCode || 'poster'}.png`;
+            link.href = canvas.toDataURL('image/png', 1.0);
             link.click();
         } catch (e) {
             console.error('Failed to generate poster:', e);
@@ -157,7 +183,7 @@ export default function AgentSharePage() {
                     <button onClick={() => router.back()} className="p-2 -ml-2 rounded-full active:bg-white/10 lg:hidden">
                         <ChevronLeft className="w-5 h-5" />
                     </button>
-                    <h1 className="text-lg font-bold flex-1">推广赚钱</h1>
+                    <h1 className="text-lg font-bold flex-1">{siteName} - 推广赚钱</h1>
                 </header>
 
                 <main className="flex-1 overflow-auto">
@@ -223,6 +249,15 @@ export default function AgentSharePage() {
                                         size={160}
                                         level="M"
                                         includeMargin={false}
+                                    />
+                                </div>
+                                {/* Use opacity-0 instead of hidden to ensure it's rendered for toDataURL */}
+                                <div id="poster-qr-canvas" className="absolute opacity-0 pointer-events-none -z-10">
+                                    <QRCodeCanvas
+                                        value={shareLink}
+                                        size={512} // Render at high res
+                                        level="H"
+                                        includeMargin={true}
                                     />
                                 </div>
                             </div>
@@ -327,54 +362,61 @@ export default function AgentSharePage() {
             </div>
             <BottomNav />
 
-            {/* Hidden Poster Template for html2canvas */}
+            {/* Hidden Poster Template for html2canvas - Compact & Aesthetic Style */}
             <div
                 ref={posterRef}
-                className="fixed -left-[9999px] top-0 w-[375px] bg-gradient-to-b from-[#1a1a2e] to-[#0f0f1a] p-6"
-                style={{ fontFamily: 'system-ui, sans-serif' }}
+                className="fixed -left-[2000px] top-0 w-[375px] h-[667px] bg-[#F4F7FA] flex flex-col items-center justify-center p-6"
+                style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
             >
-                <div className="text-center space-y-6">
-                    {/* Header */}
-                    <div>
-                        <div className="text-2xl font-bold text-white mb-2">🎬 影视平台</div>
-                        <div className="text-amber-400 text-sm">邀请您加入</div>
+                {/* Main Card Container */}
+                <div className="w-full bg-white rounded-[40px] shadow-[0_20px_50px_rgba(0,0,0,0.06)] border border-white p-8 flex flex-col items-center relative overflow-hidden">
+                    {/* Decorative element */}
+                    <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-primary/20 via-primary to-primary/20" />
+
+                    {/* Top - Branding */}
+                    <div className="mb-8 text-center">
+                        <div className="inline-block px-3 py-1 bg-primary/10 rounded-full text-primary text-[10px] font-black uppercase tracking-[0.2em] mb-2">
+                            Official Invitation
+                        </div>
+                        <h1 className="text-3xl font-black text-[#1A1A1B] tracking-tight">{siteName}</h1>
+                        <p className="text-[10px] text-gray-400 font-medium mt-1 uppercase tracking-widest">Premium Content Experience</p>
                     </div>
 
-                    {/* Commission Highlight */}
-                    <div className="bg-gradient-to-r from-amber-500/20 to-orange-500/20 rounded-2xl p-6 border border-amber-500/30">
-                        <div className="text-amber-400 text-sm mb-2">专属佣金比例</div>
-                        <div className="text-5xl font-bold text-white">{commissionPercent}%</div>
-                    </div>
-
-                    {/* QR Code */}
-                    <div className="bg-white p-4 rounded-xl inline-block mx-auto">
-                        <QRCodeSVG
-                            value={shareLink}
-                            size={140}
-                            level="M"
-                        />
-                    </div>
-
-                    {/* Code */}
-                    <div>
-                        <div className="text-white/60 text-xs mb-1">推广码</div>
-                        <div className="text-2xl font-mono font-bold text-white tracking-widest">
-                            {data.agentCode}
+                    {/* Center - QR Code Card */}
+                    <div className="relative group mb-8">
+                        <div className="absolute -inset-4 bg-gradient-to-br from-primary/5 to-primary/20 rounded-[48px] blur-xl opacity-50" />
+                        <div className="relative p-5 bg-white rounded-[32px] shadow-sm border border-gray-100">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                                id="poster-qr-img"
+                                alt="QR Code"
+                                width={180}
+                                height={180}
+                                className="block"
+                            />
                         </div>
                     </div>
 
-                    {/* Benefits */}
-                    <div className="text-left bg-white/5 rounded-xl p-4 space-y-2">
-                        <div className="text-white text-sm font-medium">✨ 加入福利</div>
-                        <div className="text-white/60 text-xs">• 海量影视资源随心看</div>
-                        <div className="text-white/60 text-xs">• 高清画质极速播放</div>
-                        <div className="text-white/60 text-xs">• 新人注册即享好礼</div>
-                    </div>
+                    {/* Bottom - Info Section */}
+                    <div className="w-full space-y-5 text-center">
+                        <div className="space-y-1">
+                            <p className="text-[#1A1A1B] text-base font-bold">扫描二维码 · 立即加入</p>
+                            <p className="text-gray-400 text-[10px] font-medium tracking-wide">加入我们，体验极致视听盛宴</p>
+                        </div>
 
-                    {/* Footer */}
-                    <div className="text-white/40 text-xs">
-                        长按识别二维码立即加入
+                        {/* Invite Code Box - Resized to be more compact */}
+                        <div className="bg-[#1A1A1B] rounded-[20px] py-3 px-8 relative inline-flex flex-col items-center shadow-lg shadow-black/5 overflow-hidden">
+                            <p className="text-white/30 text-[8px] uppercase font-black tracking-[0.2em] mb-1 relative z-10">Exclusive Invite Code</p>
+                            <p className="text-2xl font-black text-white tracking-[0.2em] relative z-10">{data.agentCode}</p>
+                        </div>
                     </div>
+                </div>
+
+                {/* Outer Footer */}
+                <div className="mt-8 text-center">
+                    <p className="text-gray-300 text-[9px] font-black tracking-[0.3em] uppercase">
+                        Quality Service • Verified Platform
+                    </p>
                 </div>
             </div>
         </>

@@ -424,7 +424,7 @@ export default function AgentCenterPage() {
                             <div className="px-4 lg:px-6">
                                 <div className="flex gap-1 lg:gap-2">
                                     {[
-                                        { key: 'overview', label: '数据概览', icon: TrendingUp },
+                                        { key: 'overview', label: '业绩概览', icon: TrendingUp },
                                         { key: 'referrals', label: '我的推广', icon: Users },
                                         { key: 'settlements', label: '结算记录', icon: Wallet },
                                     ].map((tab) => (

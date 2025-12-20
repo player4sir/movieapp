@@ -31,8 +31,40 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ message: '您的代理账号未激活' }, { status: 403 });
         }
 
-        if (!profile.agentCode) {
-            return NextResponse.json({ message: '代理推广码尚未生成，请联系管理员' }, { status: 403 });
+        // Auto-generate agentCode if missing (for agents approved before this feature)
+        let agentCode = profile.agentCode;
+        if (!agentCode) {
+            // Generate unique agent code
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let newCode = '';
+            let attempts = 0;
+
+            while (attempts < 5) {
+                newCode = 'A';
+                for (let i = 0; i < 7; i++) {
+                    newCode += chars.charAt(Math.floor(Math.random() * chars.length));
+                }
+
+                // Check uniqueness
+                const existing = await db.query.agentProfiles.findFirst({
+                    where: eq(agentProfiles.agentCode, newCode),
+                    columns: { userId: true }
+                });
+
+                if (!existing) {
+                    // Update profile with new code
+                    await db.update(agentProfiles)
+                        .set({ agentCode: newCode, updatedAt: new Date() })
+                        .where(eq(agentProfiles.userId, userId));
+                    agentCode = newCode;
+                    break;
+                }
+                attempts++;
+            }
+
+            if (!agentCode) {
+                return NextResponse.json({ message: '生成推广码失败，请重试' }, { status: 500 });
+            }
         }
 
         // Get level info
@@ -53,7 +85,7 @@ export async function GET(req: NextRequest) {
 
         return NextResponse.json({
             data: {
-                agentCode: profile.agentCode,
+                agentCode,
                 level: {
                     name: level.name,
                     commissionRate: level.commissionRate, // in basis points
