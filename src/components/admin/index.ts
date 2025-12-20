@@ -75,3 +75,6 @@ export { AdFormModal } from './AdFormModal';
 export type { AdFormData, Ad } from './AdFormModal';
 export { AdSlotFormModal } from './AdSlotFormModal';
 export type { AdSlotFormData, AdSlot } from './AdSlotFormModal';
+
+// Agent management
+export { PageHeader } from './PageHeader';

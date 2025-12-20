@@ -8,7 +8,7 @@
 import { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
-import { useToast } from '@/components/admin';
+import { useToast, PageHeader } from '@/components/admin';
 
 interface AgentConfig {
     trackingExpiryDays: number;
@@ -74,94 +74,94 @@ export default function AgentConfigPage() {
     };
 
     return (
-        <div className="p-4 lg:p-6">
-            <div className="flex items-center justify-between mb-6">
-                <h1 className="text-lg lg:text-xl font-semibold">代理商系统配置</h1>
-            </div>
+        <div className="min-h-screen bg-background pb-20">
+            <PageHeader title="系统配置" />
+            <div className="px-4 lg:px-6">
 
-            <div className="bg-surface rounded-lg border border-border/50 p-6 max-w-2xl">
-                {/* Tracking Expiry Days */}
-                <div className="mb-6">
-                    <label className="block text-sm font-medium mb-2">
-                        推广码追踪有效期（天）
-                    </label>
-                    <div className="flex items-center gap-3">
-                        <input
-                            type="number"
-                            min="1"
-                            max="365"
-                            value={config.trackingExpiryDays}
-                            onChange={(e) => setConfig(c => ({
-                                ...c,
-                                trackingExpiryDays: parseInt(e.target.value) || 30
-                            }))}
-                            className="input w-32"
-                        />
-                        <span className="text-sm text-foreground/60">
-                            用户访问推广链接后，在此期间内的订单都将归属到代理商
-                        </span>
-                    </div>
-                </div>
-
-                {/* Auto Upgrade */}
-                <div className="mb-6">
-                    <label className="flex items-center gap-3 cursor-pointer">
-                        <input
-                            type="checkbox"
-                            checked={config.autoUpgradeEnabled}
-                            onChange={(e) => setConfig(c => ({
-                                ...c,
-                                autoUpgradeEnabled: e.target.checked
-                            }))}
-                            className="w-5 h-5 accent-primary"
-                        />
-                        <div>
-                            <div className="font-medium">启用自动升级</div>
-                            <div className="text-sm text-foreground/60">
-                                当代理商满足升级条件时自动升级到更高等级
-                            </div>
+                <div className="bg-surface rounded-lg border border-border/50 p-6 max-w-2xl">
+                    {/* Tracking Expiry Days */}
+                    <div className="mb-6">
+                        <label className="block text-sm font-medium mb-2">
+                            推广码追踪有效期（天）
+                        </label>
+                        <div className="flex items-center gap-3">
+                            <input
+                                type="number"
+                                min="1"
+                                max="365"
+                                value={config.trackingExpiryDays}
+                                onChange={(e) => setConfig(c => ({
+                                    ...c,
+                                    trackingExpiryDays: parseInt(e.target.value) || 30
+                                }))}
+                                className="input w-32"
+                            />
+                            <span className="text-sm text-foreground/60">
+                                用户访问推广链接后，在此期间内的订单都将归属到代理商
+                            </span>
                         </div>
-                    </label>
-                </div>
+                    </div>
 
-                {/* Minimum Withdraw Amount */}
-                <div className="mb-6">
-                    <label className="block text-sm font-medium mb-2">
-                        最低提现金额（元）
-                    </label>
-                    <div className="flex items-center gap-3">
-                        <input
-                            type="number"
-                            min="1"
-                            value={config.minWithdrawAmount / 100}
-                            onChange={(e) => setConfig(c => ({
-                                ...c,
-                                minWithdrawAmount: (parseFloat(e.target.value) || 100) * 100
-                            }))}
-                            className="input w-32"
-                        />
-                        <span className="text-sm text-foreground/60">
-                            代理商余额达到此金额后方可申请提现
-                        </span>
+                    {/* Auto Upgrade */}
+                    <div className="mb-6">
+                        <label className="flex items-center gap-3 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={config.autoUpgradeEnabled}
+                                onChange={(e) => setConfig(c => ({
+                                    ...c,
+                                    autoUpgradeEnabled: e.target.checked
+                                }))}
+                                className="w-5 h-5 accent-primary"
+                            />
+                            <div>
+                                <div className="font-medium">启用自动升级</div>
+                                <div className="text-sm text-foreground/60">
+                                    当代理商满足升级条件时自动升级到更高等级
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+
+                    {/* Minimum Withdraw Amount */}
+                    <div className="mb-6">
+                        <label className="block text-sm font-medium mb-2">
+                            最低提现金额（元）
+                        </label>
+                        <div className="flex items-center gap-3">
+                            <input
+                                type="number"
+                                min="1"
+                                value={config.minWithdrawAmount / 100}
+                                onChange={(e) => setConfig(c => ({
+                                    ...c,
+                                    minWithdrawAmount: (parseFloat(e.target.value) || 100) * 100
+                                }))}
+                                className="input w-32"
+                            />
+                            <span className="text-sm text-foreground/60">
+                                代理商余额达到此金额后方可申请提现
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Save Button */}
+                    <div className="pt-4 border-t border-border/20">
+                        <button
+                            onClick={handleSave}
+                            disabled={saving}
+                            className="btn-primary px-6 py-2"
+                        >
+                            {saving ? '保存中...' : '保存配置'}
+                        </button>
                     </div>
                 </div>
 
-                {/* Save Button */}
-                <div className="pt-4 border-t border-border/20">
-                    <button
-                        onClick={handleSave}
-                        disabled={saving}
-                        className="btn-primary px-6 py-2"
-                    >
-                        {saving ? '保存中...' : '保存配置'}
-                    </button>
+                {/* Quick Stats */}
+                <div className="mt-8">
+                    <h2 className="text-lg font-semibold mb-4">系统概览</h2>
+                    <AgentStats />
                 </div>
-            </div>
-
-            {/* Quick Stats */}
-            <div className="mt-8">
-                <h2 className="text-lg font-semibold mb-4">系统概览</h2>
-                <AgentStats />
             </div>
         </div>
     );

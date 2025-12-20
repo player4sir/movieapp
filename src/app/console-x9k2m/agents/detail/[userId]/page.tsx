@@ -5,10 +5,11 @@
  * Shows comprehensive info for a single agent
  */
 
-import { use } from 'react';
+import { use, useState } from 'react';
 import useSWR from 'swr';
 import { useRouter } from 'next/navigation';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
+import { PageHeader } from '@/components/admin';
 
 interface AgentProfile {
     userId: string;
@@ -62,10 +63,13 @@ interface AgentDetailData {
     recentSettlements: Settlement[];
 }
 
+type TabType = 'records' | 'referrals' | 'settlements';
+
 export default function AgentDetailPage({ params }: { params: Promise<{ userId: string }> }) {
     const { userId } = use(params);
     const router = useRouter();
     const { getAccessToken } = useAdminAuth();
+    const [activeTab, setActiveTab] = useState<TabType>('records');
 
     const fetcher = async (url: string) => {
         const token = getAccessToken();
@@ -82,155 +86,185 @@ export default function AgentDetailPage({ params }: { params: Promise<{ userId: 
 
     if (error) {
         return (
-            <div className="p-6 text-center">
-                <div className="text-red-400 mb-4">加载失败: {error.message}</div>
-                <button onClick={() => router.back()} className="btn-secondary">
-                    返回
-                </button>
+            <div className="min-h-screen bg-background">
+                <PageHeader title="代理商详情" />
+                <div className="p-6 text-center">
+                    <div className="text-red-400 mb-4">加载失败: {error.message}</div>
+                    <button onClick={() => router.back()} className="btn-secondary">返回</button>
+                </div>
             </div>
         );
     }
 
     if (isLoading || !data) {
-        return <div className="p-6 text-center text-foreground/40">加载中...</div>;
+        return (
+            <div className="min-h-screen bg-background">
+                <PageHeader title="代理商详情" />
+                <div className="p-6 text-center text-foreground/40">加载中...</div>
+            </div>
+        );
     }
 
     const { profile, stats, records, recentReferrals, recentSettlements } = data;
+    const statusColors = {
+        active: 'bg-green-500/20 text-green-400',
+        pending: 'bg-yellow-500/20 text-yellow-400',
+        disabled: 'bg-red-500/20 text-red-400'
+    };
+
+    const tabs: { key: TabType; label: string; count?: number }[] = [
+        { key: 'records', label: '月度业绩', count: records.length },
+        { key: 'referrals', label: '推荐用户', count: stats.totalReferrals },
+        { key: 'settlements', label: '结算记录', count: stats.settlementCount },
+    ];
 
     return (
-        <div className="p-4 lg:p-6">
-            {/* Header */}
-            <div className="flex items-center gap-4 mb-6">
-                <button onClick={() => router.back()} className="text-foreground/60 hover:text-foreground">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                    </svg>
-                </button>
-                <div>
-                    <h1 className="text-lg lg:text-xl font-semibold">{profile.realName}</h1>
-                    <p className="text-sm text-foreground/60">{profile.contact}</p>
-                </div>
-                <span className={`ml-auto px-3 py-1 rounded-full text-sm ${profile.status === 'active' ? 'bg-green-500/20 text-green-400' :
-                        profile.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
-                            'bg-red-500/20 text-red-400'
-                    }`}>
-                    {profile.status === 'active' ? '正常' : profile.status === 'pending' ? '待审核' : '已禁用'}
-                </span>
-            </div>
+        <div className="min-h-screen bg-background pb-20">
+            <PageHeader title="代理商详情" />
 
-            {/* Stats Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <StatCard title="等级" value={profile.level?.name || '-'} />
-                <StatCard title="推广码" value={profile.agentCode || '-'} />
-                <StatCard title="佣金比例" value={`${((profile.level?.commissionRate || 0) / 100).toFixed(1)}%`} />
-                <StatCard title="推荐人数" value={stats.totalReferrals} />
-                <StatCard title="总收益" value={`¥${(profile.totalIncome / 100).toFixed(2)}`} color="text-primary" />
-                <StatCard title="待提现" value={`¥${(stats.pendingBalance / 100).toFixed(2)}`} color="text-orange-500" />
-                <StatCard title="已结算" value={`¥${(stats.totalSettled / 100).toFixed(2)}`} color="text-green-500" />
-                <StatCard title="结算次数" value={stats.settlementCount} />
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-6">
-                {/* Recent Records */}
-                <div className="bg-surface rounded-lg border border-border/50 p-4">
-                    <h2 className="font-semibold mb-3">月度业绩 (近6个月)</h2>
-                    {records.length === 0 ? (
-                        <div className="text-foreground/40 text-sm">暂无业绩记录</div>
-                    ) : (
-                        <div className="space-y-2">
-                            {records.map(record => (
-                                <div key={record.id} className="flex items-center justify-between py-2 border-b border-border/10 last:border-0">
-                                    <div>
-                                        <div className="font-medium">{record.month}</div>
-                                        <div className="text-xs text-foreground/40">
-                                            销售 ¥{record.totalSales} · 招募 {record.recruitCount}人
-                                        </div>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="font-bold text-primary">¥{(record.totalEarnings / 100).toFixed(2)}</div>
-                                        <div className={`text-xs ${record.status === 'settled' ? 'text-green-400' : 'text-yellow-400'}`}>
-                                            {record.status === 'settled' ? '已结算' : '待结算'}
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
+            <div className="px-4 lg:px-6">
+                {/* Profile Card */}
+                <div className="bg-surface rounded-xl border border-border/30 p-4 mb-4">
+                    <div className="flex items-start gap-3">
+                        <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-lg shrink-0">
+                            {(profile.realName || '?')[0]}
                         </div>
-                    )}
-                </div>
-
-                {/* Recent Referrals */}
-                <div className="bg-surface rounded-lg border border-border/50 p-4">
-                    <h2 className="font-semibold mb-3">推荐用户 (最近10位)</h2>
-                    {recentReferrals.length === 0 ? (
-                        <div className="text-foreground/40 text-sm">暂无推荐用户</div>
-                    ) : (
-                        <div className="space-y-2">
-                            {recentReferrals.map(user => (
-                                <div key={user.id} className="flex items-center justify-between py-2 border-b border-border/10 last:border-0">
-                                    <div>
-                                        <div className="font-medium">{user.nickname || user.username}</div>
-                                        <div className="text-xs text-foreground/40">
-                                            {new Date(user.createdAt).toLocaleDateString()}
-                                        </div>
-                                    </div>
-                                    <span className={`px-2 py-0.5 rounded text-xs ${user.memberLevel === 'svip' ? 'bg-purple-500/20 text-purple-400' :
-                                            user.memberLevel === 'vip' ? 'bg-yellow-500/20 text-yellow-400' :
-                                                'bg-gray-500/20 text-gray-400'
-                                        }`}>
-                                        {user.memberLevel.toUpperCase()}
-                                    </span>
-                                </div>
-                            ))}
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <h2 className="font-semibold text-lg">{profile.realName}</h2>
+                                <span className={`px-2 py-0.5 rounded-full text-xs ${statusColors[profile.status as keyof typeof statusColors] || 'bg-gray-500/20 text-gray-400'}`}>
+                                    {profile.status === 'active' ? '正常' : profile.status === 'pending' ? '待审核' : '已禁用'}
+                                </span>
+                            </div>
+                            <div className="text-sm text-foreground/60">{profile.contact}</div>
+                            <div className="flex items-center gap-3 mt-2 text-xs text-foreground/50">
+                                <span className="px-2 py-0.5 bg-primary/10 text-primary rounded">{profile.level?.name}</span>
+                                <span>佣金 {((profile.level?.commissionRate || 0) / 100).toFixed(1)}%</span>
+                                {profile.agentCode && <span>推广码: {profile.agentCode}</span>}
+                            </div>
                         </div>
-                    )}
+                    </div>
                 </div>
 
-                {/* Recent Settlements */}
-                <div className="bg-surface rounded-lg border border-border/50 p-4 md:col-span-2">
-                    <h2 className="font-semibold mb-3">结算记录 (最近5笔)</h2>
-                    {recentSettlements.length === 0 ? (
-                        <div className="text-foreground/40 text-sm">暂无结算记录</div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead className="text-foreground/60 text-xs">
-                                    <tr>
-                                        <th className="text-left py-2">时间</th>
-                                        <th className="text-right py-2">金额</th>
-                                        <th className="text-center py-2">方式</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {recentSettlements.map(s => (
-                                        <tr key={s.id} className="border-t border-border/10">
-                                            <td className="py-2 text-foreground/60">
-                                                {new Date(s.createdAt).toLocaleString()}
-                                            </td>
-                                            <td className="py-2 text-right font-bold text-green-500">
-                                                ¥{(s.amount / 100).toFixed(2)}
-                                            </td>
-                                            <td className="py-2 text-center">
-                                                <span className="px-2 py-0.5 bg-primary/10 text-primary rounded text-xs">
-                                                    {s.method === 'alipay' ? '支付宝' : s.method === 'wechat' ? '微信' : s.method}
-                                                </span>
-                                            </td>
-                                        </tr>
+                {/* Stats Grid - Compact */}
+                <div className="grid grid-cols-4 gap-2 mb-4">
+                    <div className="bg-surface rounded-lg border border-border/20 p-2.5 text-center">
+                        <div className="text-[10px] text-foreground/40 uppercase">推荐</div>
+                        <div className="text-sm font-bold">{stats.totalReferrals}</div>
+                    </div>
+                    <div className="bg-surface rounded-lg border border-border/20 p-2.5 text-center">
+                        <div className="text-[10px] text-foreground/40 uppercase">总收益</div>
+                        <div className="text-sm font-bold text-primary">¥{(profile.totalIncome / 100).toFixed(0)}</div>
+                    </div>
+                    <div className="bg-surface rounded-lg border border-border/20 p-2.5 text-center">
+                        <div className="text-[10px] text-foreground/40 uppercase">待提现</div>
+                        <div className="text-sm font-bold text-orange-500">¥{(stats.pendingBalance / 100).toFixed(0)}</div>
+                    </div>
+                    <div className="bg-surface rounded-lg border border-border/20 p-2.5 text-center">
+                        <div className="text-[10px] text-foreground/40 uppercase">已结算</div>
+                        <div className="text-sm font-bold text-green-500">¥{(stats.totalSettled / 100).toFixed(0)}</div>
+                    </div>
+                </div>
+
+                {/* Tabs */}
+                <div className="bg-surface rounded-xl border border-border/30 overflow-hidden">
+                    {/* Tab Bar */}
+                    <div className="flex border-b border-border/20">
+                        {tabs.map(tab => (
+                            <button
+                                key={tab.key}
+                                onClick={() => setActiveTab(tab.key)}
+                                className={`flex-1 px-3 py-3 text-sm font-medium transition-colors relative ${activeTab === tab.key
+                                        ? 'text-primary'
+                                        : 'text-foreground/50 hover:text-foreground/80'
+                                    }`}
+                            >
+                                {tab.label}
+                                {tab.count !== undefined && tab.count > 0 && (
+                                    <span className="ml-1 text-xs text-foreground/40">({tab.count})</span>
+                                )}
+                                {activeTab === tab.key && (
+                                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+                                )}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Tab Content */}
+                    <div className="min-h-[200px]">
+                        {/* Records Tab */}
+                        {activeTab === 'records' && (
+                            records.length === 0 ? (
+                                <div className="p-8 text-center text-foreground/40 text-sm">暂无业绩记录</div>
+                            ) : (
+                                <div className="divide-y divide-border/10">
+                                    {records.map(record => (
+                                        <div key={record.id} className="px-4 py-3 flex items-center justify-between">
+                                            <div>
+                                                <div className="font-medium text-sm">{record.month}</div>
+                                                <div className="text-xs text-foreground/40">
+                                                    销售 ¥{record.totalSales.toLocaleString()} · 招募 {record.recruitCount}人
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="font-bold text-primary text-sm">¥{(record.totalEarnings / 100).toFixed(2)}</div>
+                                                <div className={`text-xs ${record.status === 'settled' ? 'text-green-400' : 'text-yellow-400'}`}>
+                                                    {record.status === 'settled' ? '已结算' : '待结算'}
+                                                </div>
+                                            </div>
+                                        </div>
                                     ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
+                                </div>
+                            )
+                        )}
+
+                        {/* Referrals Tab */}
+                        {activeTab === 'referrals' && (
+                            recentReferrals.length === 0 ? (
+                                <div className="p-8 text-center text-foreground/40 text-sm">暂无推荐用户</div>
+                            ) : (
+                                <div className="divide-y divide-border/10">
+                                    {recentReferrals.map(user => (
+                                        <div key={user.id} className="px-4 py-2.5 flex items-center justify-between">
+                                            <div className="min-w-0">
+                                                <div className="text-sm font-medium truncate">{user.nickname || user.username}</div>
+                                                <div className="text-xs text-foreground/40">{new Date(user.createdAt).toLocaleDateString()}</div>
+                                            </div>
+                                            <span className={`px-2 py-0.5 rounded text-xs shrink-0 ${user.memberLevel === 'svip' ? 'bg-purple-500/20 text-purple-400' :
+                                                    user.memberLevel === 'vip' ? 'bg-yellow-500/20 text-yellow-400' :
+                                                        'bg-gray-500/20 text-gray-400'
+                                                }`}>
+                                                {user.memberLevel.toUpperCase()}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )
+                        )}
+
+                        {/* Settlements Tab */}
+                        {activeTab === 'settlements' && (
+                            recentSettlements.length === 0 ? (
+                                <div className="p-8 text-center text-foreground/40 text-sm">暂无结算记录</div>
+                            ) : (
+                                <div className="divide-y divide-border/10">
+                                    {recentSettlements.map(s => (
+                                        <div key={s.id} className="px-4 py-2.5 flex items-center justify-between">
+                                            <div>
+                                                <div className="font-bold text-green-500 text-sm">¥{(s.amount / 100).toFixed(2)}</div>
+                                                <div className="text-xs text-foreground/40">{new Date(s.createdAt).toLocaleDateString()}</div>
+                                            </div>
+                                            <span className="px-2 py-0.5 bg-primary/10 text-primary rounded text-xs">
+                                                {s.method === 'alipay' ? '支付宝' : s.method === 'wechat' ? '微信' : s.method === 'kangxun' ? '康讯' : s.method}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )
+                        )}
+                    </div>
                 </div>
             </div>
-        </div>
-    );
-}
-
-function StatCard({ title, value, color = 'text-foreground' }: { title: string; value: string | number; color?: string }) {
-    return (
-        <div className="bg-surface rounded-lg border border-border/50 p-3">
-            <div className="text-xs text-foreground/60 mb-1">{title}</div>
-            <div className={`text-lg font-bold ${color} truncate`}>{value}</div>
         </div>
     );
 }

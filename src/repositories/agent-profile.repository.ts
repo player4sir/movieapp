@@ -89,16 +89,22 @@ export class AgentProfileRepository extends BaseRepository {
     /**
      * List all agent profiles (for admin)
      */
-    async list(params: any = {}): Promise<any> {
+    async list(params: URLSearchParams | Record<string, string> = {}): Promise<any> {
         try {
-            const conditions = [];
-            if (params.get('status')) {
-                conditions.push(eq(agentProfiles.status, params.get('status')));
-            }
+
+            // Support both URLSearchParams and plain object
+            const getParam = (key: string): string | null => {
+                if (params instanceof URLSearchParams) {
+                    return params.get(key);
+                }
+                return (params as Record<string, string>)[key] || null;
+            };
+
+            const status = getParam('status') as 'pending' | 'active' | 'rejected' | 'disabled' | null;
 
             // Simple list for now
             const data = await this.db.query.agentProfiles.findMany({
-                where: conditions.length ? and(...conditions) : undefined,
+                where: status ? eq(agentProfiles.status, status) : undefined,
                 with: { level: true },
                 orderBy: [desc(agentProfiles.createdAt)],
             });

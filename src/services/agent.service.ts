@@ -316,8 +316,8 @@ export function getCurrentMonth(): string {
  * Process order commission
  * 1. Find referrer
  * 2. Check if referrer is active agent
- * 3. Calculate commission
- * 4. Update Agent Profile (Income & Balance)
+ * 3. Calculate commission + bonus using unified formula
+ * 4. Update Agent Profile (Income & Balance) - includes commission + bonus
  * 5. Update Agent Record (Daily/Month stats)
  */
 export async function processOrderCommission(
@@ -357,38 +357,40 @@ export async function processOrderCommission(
         return; // Referrer is not an active agent
     }
 
-    // 3. Calculate Commission
+    // 3. Get Level Configuration
     const level = await getAgentLevelById(agentProfile.levelId);
     if (!level) return;
 
-    // commissionRate 1000 = 10%
-    const commissionAmount = Math.floor(orderAmount * level.commissionRate / 10000);
-    if (commissionAmount <= 0) return;
+    // 4. Calculate Commission + Bonus using unified formula
+    // orderAmount is in cents (fen), convert to yuan for calculateEarnings
+    const orderAmountYuan = orderAmount / 100;
+    const { commissionAmount, bonusAmount, totalEarnings } = calculateEarnings(
+        orderAmountYuan,
+        level.commissionRate,
+        level.hasBonus,
+        level.bonusRate
+    );
 
-    // 4. Update Profile Income
-    await agentProfileRepository.addIncome(referrerId, commissionAmount);
+    if (totalEarnings <= 0) return;
 
-    // 5. Update/Create Monthly Record
+    // 5. Update Profile Income & Balance (includes BOTH commission AND bonus)
+    await agentProfileRepository.addIncome(referrerId, totalEarnings);
+
+    // 6. Update/Create Monthly Record
     const month = getCurrentMonth();
     const existingRecord = await agentRecordRepository.findByUserIdAndMonth(referrerId, month);
 
     if (existingRecord) {
-        // Update existing record
-        // Note: We need to be careful not to overwrite accumulated values if we use updateAgentRecord which recalculates based on totalSales
-        // But here we are incrementing.
-        // Let's use simpler update or ensure we have correct totalSales.
-        // Actually updateAgentRecord recalculates earnings based on TOTAL sales.
-        // So we should fetch current, add new amount, and let it recalculate.
+        // Accumulate sales for the month
+        // Note: agentRecords stores totalSales in yuan
+        const newTotalSales = existingRecord.totalSales + Math.floor(orderAmountYuan);
 
-        const newTotalSales = existingRecord.totalSales + Math.floor(orderAmount / 100);
-
+        // updateAgentRecord will recalculate earnings based on newTotalSales and current level
         await updateAgentRecord(existingRecord.id, {
             totalSales: newTotalSales,
-            // The service will automatically recalculate commissionAmount, bonusAmount, totalEarnings based on newTotalSales and current Level
         });
     } else {
-        // Create new record
-        const salesInYuan = Math.floor(orderAmount / 100);
+        // Create new record for this month
         await createAgentRecord({
             agentName: agentProfile.realName || 'Agent',
             agentContact: agentProfile.contact || '',
@@ -396,13 +398,15 @@ export async function processOrderCommission(
             month,
             recruitCount: 0,
             dailySales: 0,
-            totalSales: salesInYuan,
+            totalSales: Math.floor(orderAmountYuan),
             userId: referrerId,
             status: 'pending',
         });
     }
 
-    // 6. Check for level upgrade after commission processing
+    console.log(`[Commission] Agent ${referrerId}: order ¥${orderAmountYuan}, commission ¥${commissionAmount / 100}, bonus ¥${bonusAmount / 100}, total ¥${totalEarnings / 100}`);
+
+    // 7. Check for level upgrade after commission processing
     try {
         const { checkAndUpgradeLevel } = await import('./agent-profile.service');
         await checkAndUpgradeLevel(referrerId);
