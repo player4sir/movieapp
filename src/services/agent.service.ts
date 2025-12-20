@@ -313,16 +313,23 @@ export function getCurrentMonth(): string {
     return `${year}-${month}`;
 }
 /**
- * Process order commission
- * 1. Find referrer
- * 2. Check if referrer is active agent
- * 3. Calculate commission + bonus using unified formula
- * 4. Update Agent Profile (Income & Balance) - includes commission + bonus
- * 5. Update Agent Record (Daily/Month stats)
+ * Process order commission - THREE-LEVEL REFERRAL SYSTEM
+ * 
+ * Let-benefit model (让利模式):
+ * - Each agent has their own commissionRate (from parent or system)
+ * - Each agent can set subAgentRate for their sub-agents
+ * - Agent's actual earning = commissionRate - subAgentRate
+ * 
+ * Example:
+ * - A (10%) -> B (6%) -> C (4%) with user order 100 yuan
+ * - C earns: 4% = 4 yuan (direct commission)
+ * - B earns: 6% - 4% = 2% = 2 yuan (indirect from C's sales)
+ * - A earns: 10% - 6% = 4% = 4 yuan (indirect from B's sales)
+ * - Total: 10 yuan = exactly A's commission rate
  */
 export async function processOrderCommission(
     userId: string,
-    orderAmount: number, // in cents
+    orderAmount: number, // in cents (fen)
     orderType: 'membership' | 'coin',
     explicitAgentId?: string | null
 ): Promise<void> {
@@ -334,7 +341,7 @@ export async function processOrderCommission(
     const userRepository = new UserRepository();
     const agentProfileRepository = new AgentProfileRepository();
 
-    // 1. Identify Referrer (Agent)
+    // 1. Identify Referrer (Direct Agent)
     let referrerId: string | null | undefined = explicitAgentId;
 
     if (!referrerId) {
@@ -351,67 +358,91 @@ export async function processOrderCommission(
         return;
     }
 
-    // 2. Check Agent Status
-    const agentProfile = await getAgentProfile(referrerId);
-    if (!agentProfile || agentProfile.status !== 'active') {
+    // 2. Get Direct Agent Profile (Level 3 - closest to user)
+    const directAgent = await getAgentProfile(referrerId);
+    if (!directAgent || directAgent.status !== 'active') {
         return; // Referrer is not an active agent
     }
 
-    // 3. Get Level Configuration
-    const level = await getAgentLevelById(agentProfile.levelId);
-    if (!level) return;
-
-    // 4. Calculate Commission + Bonus using unified formula
-    // orderAmount is in cents (fen), convert to yuan for calculateEarnings
     const orderAmountYuan = orderAmount / 100;
-    const { commissionAmount, bonusAmount, totalEarnings } = calculateEarnings(
-        orderAmountYuan,
-        level.commissionRate,
-        level.hasBonus,
-        level.bonusRate
-    );
-
-    if (totalEarnings <= 0) return;
-
-    // 5. Update Profile Income & Balance (includes BOTH commission AND bonus)
-    await agentProfileRepository.addIncome(referrerId, totalEarnings);
-
-    // 6. Update/Create Monthly Record
     const month = getCurrentMonth();
-    const existingRecord = await agentRecordRepository.findByUserIdAndMonth(referrerId, month);
 
-    if (existingRecord) {
-        // Accumulate sales for the month
-        // Note: agentRecords stores totalSales in yuan
-        const newTotalSales = existingRecord.totalSales + Math.floor(orderAmountYuan);
+    // 3. Calculate and distribute commissions for up to 3 levels
 
-        // updateAgentRecord will recalculate earnings based on newTotalSales and current level
-        await updateAgentRecord(existingRecord.id, {
-            totalSales: newTotalSales,
-        });
-    } else {
-        // Create new record for this month
-        await createAgentRecord({
-            agentName: agentProfile.realName || 'Agent',
-            agentContact: agentProfile.contact || '',
-            levelId: agentProfile.levelId,
-            month,
-            recruitCount: 0,
-            dailySales: 0,
-            totalSales: Math.floor(orderAmountYuan),
-            userId: referrerId,
-            status: 'pending',
-        });
+    // Level 3 (Direct Agent) - gets their full commissionRate
+    const directCommission = Math.floor(orderAmount * directAgent.commissionRate / 10000);
+
+    if (directCommission > 0) {
+        await agentProfileRepository.addIncome(directAgent.userId, directCommission);
+        console.log(`[Commission L3] Agent ${directAgent.userId}: ¥${directCommission / 100} (direct ${directAgent.commissionRate / 100}%)`);
     }
 
-    console.log(`[Commission] Agent ${referrerId}: order ¥${orderAmountYuan}, commission ¥${commissionAmount / 100}, bonus ¥${bonusAmount / 100}, total ¥${totalEarnings / 100}`);
+    // Update/Create monthly record for direct agent
+    await updateOrCreateAgentRecord(directAgent, orderAmountYuan, month);
 
-    // 7. Check for level upgrade after commission processing
+    // Level 2 (Parent Agent) - gets their commissionRate minus what they gave to child
+    if (directAgent.parentAgentId) {
+        const level2Agent = await getAgentProfile(directAgent.parentAgentId);
+        if (level2Agent && level2Agent.status === 'active') {
+            // Level 2 earns the difference between their rate and what they gave to Level 3
+            const level2Rate = level2Agent.commissionRate - level2Agent.subAgentRate;
+            const level2Commission = Math.floor(orderAmount * level2Rate / 10000);
+
+            if (level2Commission > 0) {
+                await agentProfileRepository.addIncome(level2Agent.userId, level2Commission);
+                console.log(`[Commission L2] Agent ${level2Agent.userId}: ¥${level2Commission / 100} (indirect ${level2Rate / 100}%)`);
+            }
+
+            // Level 1 (Top Agent) - gets their rate minus what they gave to Level 2
+            if (level2Agent.parentAgentId) {
+                const level1Agent = await getAgentProfile(level2Agent.parentAgentId);
+                if (level1Agent && level1Agent.status === 'active') {
+                    const level1Rate = level1Agent.commissionRate - level1Agent.subAgentRate;
+                    const level1Commission = Math.floor(orderAmount * level1Rate / 10000);
+
+                    if (level1Commission > 0) {
+                        await agentProfileRepository.addIncome(level1Agent.userId, level1Commission);
+                        console.log(`[Commission L1] Agent ${level1Agent.userId}: ¥${level1Commission / 100} (indirect ${level1Rate / 100}%)`);
+                    }
+                }
+            }
+        }
+    }
+
+    // 4. Check for level upgrade
     try {
         const { checkAndUpgradeLevel } = await import('./agent-profile.service');
         await checkAndUpgradeLevel(referrerId);
     } catch (error) {
         console.error('Failed to check agent level upgrade:', error);
+    }
+}
+
+/**
+ * Helper: Update or create agent monthly record
+ */
+async function updateOrCreateAgentRecord(
+    agent: { userId: string; realName: string; contact: string; levelId: string },
+    orderAmountYuan: number,
+    month: string
+): Promise<void> {
+    const existingRecord = await agentRecordRepository.findByUserIdAndMonth(agent.userId, month);
+
+    if (existingRecord) {
+        const newTotalSales = existingRecord.totalSales + Math.floor(orderAmountYuan);
+        await updateAgentRecord(existingRecord.id, { totalSales: newTotalSales });
+    } else {
+        await createAgentRecord({
+            agentName: agent.realName || 'Agent',
+            agentContact: agent.contact || '',
+            levelId: agent.levelId,
+            month,
+            recruitCount: 0,
+            dailySales: 0,
+            totalSales: Math.floor(orderAmountYuan),
+            userId: agent.userId,
+            status: 'pending',
+        });
     }
 }
 

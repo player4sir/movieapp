@@ -634,12 +634,24 @@ export const agentProfiles = pgTable('AgentProfile', {
   paymentAccount: text('paymentAccount'),                      // 收款账号
   totalIncome: integer('totalIncome').default(0).notNull(),    // 总收入（分）
   balance: integer('balance').default(0).notNull(),            // 可提现余额（分）
+
+  // 三级代理裂变关系链
+  parentAgentId: text('parentAgentId'),                        // 直接上级代理ID
+  level1AgentId: text('level1AgentId'),                        // 一级代理（最顶层）
+  level2AgentId: text('level2AgentId'),                        // 二级代理
+
+  // 佣金配置（让利模式）
+  commissionRate: integer('commissionRate').default(1000).notNull(),  // 自己的佣金率（从上级/系统获得，基点1000=10%）
+  subAgentRate: integer('subAgentRate').default(0).notNull(),         // 给下级的佣金率（基点，不能超过commissionRate）
+
   createdAt: timestamp('createdAt').defaultNow().notNull(),
   updatedAt: timestamp('updatedAt').notNull(),
 }, (table) => [
   index('AgentProfile_status_idx').on(table.status),
   index('AgentProfile_levelId_idx').on(table.levelId),
   uniqueIndex('AgentProfile_agentCode_key').on(table.agentCode),
+  index('AgentProfile_parentAgentId_idx').on(table.parentAgentId),
+  index('AgentProfile_level1AgentId_idx').on(table.level1AgentId),
 ]);
 
 export const agentRecords = pgTable('AgentRecord', {

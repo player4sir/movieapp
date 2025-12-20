@@ -51,10 +51,11 @@ export async function getAgentProfile(userId: string): Promise<AgentProfile | nu
 
 /**
  * Apply for Agent Status
+ * If inviteCode is provided, bind to parent agent and inherit commission rate
  */
 export async function applyForAgent(
     userId: string,
-    data: { realName: string; contact: string }
+    data: { realName: string; contact: string; inviteCode?: string }
 ): Promise<AgentProfile> {
     const existing = await agentProfileRepository.findByUserId(userId);
     if (existing) {
@@ -76,6 +77,39 @@ export async function applyForAgent(
     }
     const defaultLevel = levels.sort((a, b) => a.sortOrder - b.sortOrder)[0];
 
+    // Handle invitation by parent agent
+    let parentAgentId: string | null = null;
+    let level1AgentId: string | null = null;
+    let level2AgentId: string | null = null;
+    let commissionRate = defaultLevel.commissionRate; // Default from system level
+
+    if (data.inviteCode) {
+        const parentAgent = await agentProfileRepository.findByAgentCode(data.inviteCode);
+        if (parentAgent && parentAgent.status === 'active') {
+            // Validate that parent has set a subAgentRate
+            if (parentAgent.subAgentRate > 0) {
+                parentAgentId = parentAgent.userId;
+                commissionRate = parentAgent.subAgentRate; // Inherit rate from parent
+
+                // Build the relationship chain
+                if (parentAgent.level1AgentId) {
+                    // Parent is Level 3, this agent would be Level 4 (not allowed in 3-tier system)
+                    // Treat parent as Level 2, grandparent as Level 1
+                    level1AgentId = parentAgent.level1AgentId;
+                    level2AgentId = parentAgent.userId;
+                } else if (parentAgent.parentAgentId) {
+                    // Parent is Level 2, grandparent is Level 1
+                    level1AgentId = parentAgent.parentAgentId;
+                    level2AgentId = parentAgent.userId;
+                } else {
+                    // Parent is Level 1 (top agent)
+                    level1AgentId = parentAgent.userId;
+                    level2AgentId = null;
+                }
+            }
+        }
+    }
+
     return agentProfileRepository.create({
         userId,
         levelId: defaultLevel.id,
@@ -84,6 +118,11 @@ export async function applyForAgent(
         contact: data.contact,
         totalIncome: 0,
         balance: 0,
+        parentAgentId,
+        level1AgentId,
+        level2AgentId,
+        commissionRate,
+        subAgentRate: 0, // New agents start with 0, must set before inviting others
         createdAt: new Date(),
         updatedAt: new Date(),
     });
@@ -92,6 +131,7 @@ export async function applyForAgent(
 /**
  * Approve Agent Application (Admin)
  * Generates unique agentCode on approval
+ * For top-level agents (no parent), sets commissionRate from their level
  */
 export async function approveAgent(userId: string): Promise<AgentProfile> {
     const profile = await agentProfileRepository.findByUserId(userId);
@@ -103,9 +143,19 @@ export async function approveAgent(userId: string): Promise<AgentProfile> {
         agentCode = await generateAgentCode();
     }
 
+    // For top-level agents (no parent), set commissionRate from level configuration
+    let commissionRate = profile.commissionRate;
+    if (!profile.parentAgentId) {
+        const level = await agentLevelRepository.findById(profile.levelId);
+        if (level) {
+            commissionRate = level.commissionRate;
+        }
+    }
+
     return agentProfileRepository.update(userId, {
         status: 'active',
-        agentCode
+        agentCode,
+        commissionRate,
     }) as Promise<AgentProfile>;
 }
 
@@ -120,12 +170,61 @@ export async function rejectAgent(userId: string): Promise<AgentProfile> {
 }
 
 /**
+ * Set commission rate for sub-agents (让利设置)
+ * This rate will be given to agents invited by this agent
+ */
+export async function setSubAgentRate(userId: string, subAgentRate: number): Promise<AgentProfile> {
+    const profile = await agentProfileRepository.findByUserId(userId);
+    if (!profile) throw { ...AGENT_PROFILE_ERRORS.PROFILE_NOT_FOUND };
+
+    // Validate: subAgentRate must be less than commissionRate
+    if (subAgentRate >= profile.commissionRate) {
+        throw { code: 'INVALID_RATE', message: '下级佣金率必须小于您的佣金率' };
+    }
+
+    // Validate: subAgentRate must be non-negative
+    if (subAgentRate < 0) {
+        throw { code: 'INVALID_RATE', message: '下级佣金率不能为负数' };
+    }
+
+    return agentProfileRepository.update(userId, { subAgentRate }) as Promise<AgentProfile>;
+}
+
+/**
+ * Get team info for an agent
+ */
+export async function getTeamInfo(userId: string): Promise<{
+    subAgents: AgentProfile[];
+    teamCount: { direct: number; total: number };
+}> {
+    const profile = await agentProfileRepository.findByUserId(userId);
+    if (!profile) throw { ...AGENT_PROFILE_ERRORS.PROFILE_NOT_FOUND };
+
+    const subAgents = await agentProfileRepository.getSubAgents(userId);
+    const teamCount = await agentProfileRepository.getTeamCount(userId);
+
+    return { subAgents, teamCount };
+}
+
+/**
+ * Get parent agent info
+ */
+export async function getParentAgent(userId: string): Promise<AgentProfile | null> {
+    const profile = await agentProfileRepository.findByUserId(userId);
+    if (!profile || !profile.parentAgentId) return null;
+
+    return agentProfileRepository.findByUserId(profile.parentAgentId);
+}
+
+/**
  * Update Agent Profile Details (Admin)
  * Records level change log when levelId changes
+ * Supports updating commissionRate and subAgentRate for top-level agents
+ * When level changes for top-level agents, auto-updates commissionRate from new level
  */
 export async function updateAgentProfile(
     userId: string,
-    data: Partial<Pick<AgentProfile, 'realName' | 'contact' | 'levelId' | 'status'>>,
+    data: Partial<Pick<AgentProfile, 'realName' | 'contact' | 'levelId' | 'status' | 'commissionRate' | 'subAgentRate'>>,
     adminId?: string
 ): Promise<AgentProfile> {
     const profile = await agentProfileRepository.findByUserId(userId);
@@ -141,6 +240,14 @@ export async function updateAgentProfile(
             adminId,
             '管理员手动调整'
         );
+
+        // For top-level agents, sync commissionRate from new level (unless explicitly provided)
+        if (!profile.parentAgentId && data.commissionRate === undefined) {
+            const newLevel = await agentLevelRepository.findById(data.levelId);
+            if (newLevel) {
+                data.commissionRate = newLevel.commissionRate;
+            }
+        }
     }
 
     return agentProfileRepository.update(userId, data) as Promise<AgentProfile>;

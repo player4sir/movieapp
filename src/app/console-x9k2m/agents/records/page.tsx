@@ -56,8 +56,6 @@ export default function AgentRecordsPage() {
     const [search, setSearch] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const debounceTimer = useRef<NodeJS.Timeout | null>(null);
-
-    const [isSettling, setIsSettling] = useState(false);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingRecord, setEditingRecord] = useState<AgentRecord | null>(null);
     const [formData, setFormData] = useState({
@@ -167,47 +165,6 @@ export default function AgentRecordsPage() {
         }
     };
 
-    // Single record settlement
-    const handleSettle = async (id: string, agentName: string) => {
-        if (!confirm(`确定将 ${agentName} 的记录标记为已结算？`)) return;
-        const token = getAccessToken();
-        if (!token) return;
-        try {
-            const res = await fetch(`/api/admin/agents/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ status: 'settled' }),
-            });
-            if (!res.ok) throw new Error('结算失败');
-            showToast({ message: '结算成功', type: 'success' });
-            mutateRecords();
-        } catch (e) {
-            showToast({ message: '结算失败', type: 'error' });
-        }
-    };
-
-    const handleBatchSettle = async () => {
-        if (!confirm(`将 ${pendingRecords.length} 条记录标记为已结算？`)) return;
-        const token = getAccessToken();
-        if (!token) return;
-        setIsSettling(true);
-        try {
-            const res = await fetch('/api/admin/agents/batch', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ operation: 'settle', month }),
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.message);
-            showToast({ message: `已结算 ${data.affected} 条`, type: 'success' });
-            mutateRecords();
-        } catch (e) {
-            showToast({ message: '结算失败', type: 'error' });
-        } finally {
-            setIsSettling(false);
-        }
-    };
-
     return (
         <div className="min-h-screen bg-background pb-20">
             <PageHeader title="业绩管理">
@@ -282,17 +239,6 @@ export default function AgentRecordsPage() {
                     </button>
                 </div>
 
-                {/* Batch Settle Button */}
-                {activeTab === 'pending' && pendingRecords.length > 0 && (
-                    <button
-                        onClick={handleBatchSettle}
-                        disabled={isSettling}
-                        className="w-full mb-4 py-2.5 text-sm bg-green-500/10 text-green-500 rounded-lg hover:bg-green-500/20 transition-colors"
-                    >
-                        {isSettling ? '处理中...' : `一键结算全部 (${pendingRecords.length}条)`}
-                    </button>
-                )}
-
                 {/* Records List */}
                 <div className="space-y-2">
                     {records.map(record => (
@@ -311,9 +257,6 @@ export default function AgentRecordsPage() {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0 text-xs">
-                                    {record.status === 'pending' && (
-                                        <button onClick={() => handleSettle(record.id, record.agentName)} className="px-2 py-1 text-green-500">结算</button>
-                                    )}
                                     <button onClick={() => handleEdit(record)} className="px-2 py-1 text-primary">编辑</button>
                                     <button onClick={() => handleDelete(record.id)} className="px-2 py-1 text-red-500">删除</button>
                                 </div>

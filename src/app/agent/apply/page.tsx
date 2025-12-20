@@ -1,18 +1,27 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks';
 import { Sidebar } from '@/components/layout/Sidebar';
-import { ChevronLeft, CheckCircle2 } from 'lucide-react';
+import { ChevronLeft, CheckCircle2, UserPlus } from 'lucide-react';
 
 export default function AgentApplyPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const { getAccessToken } = useAuth();
     const [submitting, setSubmitting] = useState(false);
     const [success, setSuccess] = useState(false);
-    const [form, setForm] = useState({ realName: '', contact: '' });
+    const [form, setForm] = useState({ realName: '', contact: '', inviteCode: '' });
     const [error, setError] = useState('');
+
+    // Get invite code from URL
+    useEffect(() => {
+        const invite = searchParams.get('invite');
+        if (invite) {
+            setForm(prev => ({ ...prev, inviteCode: invite }));
+        }
+    }, [searchParams]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -29,7 +38,11 @@ export default function AgentApplyPage() {
                     'Content-Type': 'application/json',
                     'Authorization': token ? `Bearer ${token}` : '',
                 },
-                body: JSON.stringify(form),
+                body: JSON.stringify({
+                    realName: form.realName,
+                    contact: form.contact,
+                    inviteCode: form.inviteCode || undefined,
+                }),
             });
 
             if (res.ok) {
@@ -54,6 +67,7 @@ export default function AgentApplyPage() {
                 <h1 className="text-2xl font-bold">申请已提交</h1>
                 <p className="text-foreground/60">
                     您的合伙人申请已收到，我们将尽快进行审核。<br />
+                    {form.inviteCode && '您已通过邀请链接申请，审核通过后将绑定上级代理。'}
                     审核通过后，您将在个人中心看到代理入口。
                 </p>
                 <button
@@ -83,6 +97,17 @@ export default function AgentApplyPage() {
                     </p>
                 </div>
 
+                {/* Invite Code Notice */}
+                {form.inviteCode && (
+                    <div className="bg-primary/10 border border-primary/20 rounded-xl p-4 mb-6 flex items-start gap-3">
+                        <UserPlus className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                        <div className="text-sm">
+                            <p className="font-medium text-primary">通过邀请链接申请</p>
+                            <p className="text-foreground/60">邀请码: {form.inviteCode}</p>
+                        </div>
+                    </div>
+                )}
+
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-foreground/80">真实姓名</label>
@@ -106,6 +131,21 @@ export default function AgentApplyPage() {
                         />
                     </div>
 
+                    {/* Manual invite code input if not from URL */}
+                    {!searchParams.get('invite') && (
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-foreground/80">邀请码（选填）</label>
+                            <input
+                                type="text"
+                                value={form.inviteCode}
+                                onChange={e => setForm(prev => ({ ...prev, inviteCode: e.target.value.toUpperCase() }))}
+                                className="w-full bg-surface border border-white/5 rounded-xl px-4 py-3 outline-none focus:border-primary/50 transition-colors"
+                                placeholder="如有上级代理的邀请码请填写"
+                                maxLength={8}
+                            />
+                        </div>
+                    )}
+
                     {error && (
                         <p className="text-red-400 text-sm text-center bg-red-500/10 py-2 rounded-lg">
                             {error}
@@ -124,3 +164,4 @@ export default function AgentApplyPage() {
         </div>
     );
 }
+

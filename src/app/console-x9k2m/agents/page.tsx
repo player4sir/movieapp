@@ -29,6 +29,10 @@ interface AgentProfile {
     level: AgentLevel;
     agentCode: string | null;
     createdAt: string;
+    // Multi-level fields
+    parentAgentId?: string | null;
+    commissionRate: number;
+    subAgentRate: number;
 }
 
 type TabType = 'list' | 'applications';
@@ -57,7 +61,12 @@ export default function AgentManagementPage() {
         contact: '',
         levelId: '',
         status: '' as AgentProfile['status'],
+        commissionRate: 1000,
     });
+
+    // Delete Confirmation State
+    const [deleteConfirm, setDeleteConfirm] = useState<AgentProfile | null>(null);
+    const [deleting, setDeleting] = useState(false);
 
     const fetcher = async (url: string) => {
         const token = getAccessToken();
@@ -109,6 +118,7 @@ export default function AgentManagementPage() {
             contact: profile.contact,
             levelId: profile.levelId,
             status: profile.status,
+            commissionRate: profile.commissionRate ?? 1000,
         });
         setIsEditOpen(true);
     };
@@ -129,6 +139,29 @@ export default function AgentManagementPage() {
             mutateActive();
         } catch (e) {
             showToast({ message: e instanceof Error ? e.message : '更新失败', type: 'error' });
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!deleteConfirm) return;
+        const token = getAccessToken();
+        if (!token) return;
+
+        setDeleting(true);
+        try {
+            const res = await fetch(`/api/admin/agent-profiles?userId=${deleteConfirm.userId}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || '删除失败');
+            showToast({ message: '删除成功', type: 'success' });
+            setDeleteConfirm(null);
+            mutateActive();
+        } catch (e) {
+            showToast({ message: e instanceof Error ? e.message : '删除失败', type: 'error' });
+        } finally {
+            setDeleting(false);
         }
     };
 
@@ -207,6 +240,7 @@ export default function AgentManagementPage() {
                     <AgentListContent
                         profiles={activeProfiles}
                         onEdit={handleEdit}
+                        onDelete={setDeleteConfirm}
                         formatMoney={formatMoney}
                     />
                 ) : (
@@ -216,6 +250,42 @@ export default function AgentManagementPage() {
                     />
                 )}
             </div>
+
+            {/* Delete Confirmation Modal */}
+            {deleteConfirm && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setDeleteConfirm(null)}>
+                    <div className="bg-background rounded-xl p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+                        <h2 className="text-lg font-semibold mb-2">确认删除</h2>
+                        <p className="text-foreground/60 text-sm mb-4">
+                            确定要删除代理商 <span className="font-medium text-foreground">{deleteConfirm.realName}</span> 吗？
+                            {deleteConfirm.balance > 0 && (
+                                <span className="block mt-2 text-orange-500">
+                                    注意：该代理商还有 ¥{(deleteConfirm.balance / 100).toFixed(2)} 未结算余额
+                                </span>
+                            )}
+                        </p>
+                        <p className="text-xs text-foreground/40 mb-4">
+                            此操作不可撤销，删除后该代理商的档案将被永久移除。
+                        </p>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setDeleteConfirm(null)}
+                                className="flex-1 py-2.5 rounded-lg bg-surface-secondary text-foreground"
+                                disabled={deleting}
+                            >
+                                取消
+                            </button>
+                            <button
+                                onClick={handleDelete}
+                                className="flex-1 py-2.5 rounded-lg bg-red-500 hover:bg-red-600 text-white disabled:opacity-50"
+                                disabled={deleting}
+                            >
+                                {deleting ? '删除中...' : '确认删除'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Edit Modal */}
             {isEditOpen && (
@@ -272,6 +342,24 @@ export default function AgentManagementPage() {
                                     <option value="disabled">禁用</option>
                                 </select>
                             </div>
+                            {/* Commission Rate - only show for top-level agents (no parent) */}
+                            {!editingProfile?.parentAgentId && (
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">佣金率 (%)</label>
+                                    <input
+                                        type="number"
+                                        step="0.1"
+                                        min="0"
+                                        max="100"
+                                        value={(editFormData.commissionRate / 100).toFixed(1)}
+                                        onChange={e => setEditFormData(f => ({ ...f, commissionRate: Math.round(parseFloat(e.target.value) * 100) }))}
+                                        className="input w-full"
+                                    />
+                                    <p className="text-xs text-foreground/40 mt-1">
+                                        顶级代理的佣金率由管理员设置，下级代理的佣金率由上级设置
+                                    </p>
+                                </div>
+                            )}
                             <div className="flex gap-3 pt-2">
                                 <button onClick={() => setIsEditOpen(false)} className="flex-1 py-2.5 rounded-lg bg-surface-secondary text-foreground">取消</button>
                                 <button onClick={handleUpdate} className="flex-1 py-2.5 rounded-lg bg-primary text-white">保存</button>
@@ -288,10 +376,12 @@ export default function AgentManagementPage() {
 function AgentListContent({
     profiles,
     onEdit,
+    onDelete,
     formatMoney,
 }: {
     profiles: AgentProfile[];
     onEdit: (profile: AgentProfile) => void;
+    onDelete: (profile: AgentProfile) => void;
     formatMoney: (cents: number) => string;
 }) {
     if (profiles.length === 0) {
@@ -327,6 +417,7 @@ function AgentListContent({
                             <div className="flex items-center gap-2 shrink-0">
                                 <Link href={`/console-x9k2m/agents/detail/${p.userId}`} className="px-2 py-1 text-xs text-foreground/60 hover:text-foreground">详情</Link>
                                 <button onClick={() => onEdit(p)} className="px-2 py-1 text-xs text-primary">编辑</button>
+                                <button onClick={() => onDelete(p)} className="px-2 py-1 text-xs text-red-500">删除</button>
                             </div>
                         </div>
                     </div>
@@ -372,6 +463,7 @@ function AgentListContent({
                                     <div className="flex justify-end gap-3">
                                         <Link href={`/console-x9k2m/agents/detail/${p.userId}`} className="text-foreground/60 hover:text-primary text-sm">详情</Link>
                                         <button onClick={() => onEdit(p)} className="text-primary hover:underline text-sm">编辑</button>
+                                        <button onClick={() => onDelete(p)} className="text-red-500 hover:underline text-sm">删除</button>
                                     </div>
                                 </td>
                             </tr>

@@ -88,50 +88,49 @@ export default function SettlementHistoryPage() {
             <PageHeader title="结算历史" />
             <div className="px-4 lg:px-6">
 
-                {/* Summary Cards */}
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div className="bg-surface rounded-lg border border-border/50 p-4">
-                        <div className="text-sm text-foreground/60">总结算笔数</div>
-                        <div className="text-2xl font-bold text-primary">{summary.totalCount}</div>
+                {/* Summary Cards - Compact */}
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                    <div className="bg-surface rounded-lg border border-border/30 px-3 py-2">
+                        <div className="text-[10px] text-foreground/40 uppercase">结算笔数</div>
+                        <div className="text-lg font-bold text-primary">{summary.totalCount}</div>
                     </div>
-                    <div className="bg-surface rounded-lg border border-border/50 p-4">
-                        <div className="text-sm text-foreground/60">总结算金额</div>
-                        <div className="text-2xl font-bold text-green-500">
+                    <div className="bg-surface rounded-lg border border-border/30 px-3 py-2">
+                        <div className="text-[10px] text-foreground/40 uppercase">结算金额</div>
+                        <div className="text-lg font-bold text-green-500">
                             ¥{(summary.totalAmount / 100).toFixed(2)}
                         </div>
                     </div>
                 </div>
 
-                {/* Filters */}
-                <div className="bg-surface rounded-lg border border-border/50 p-4 mb-4">
-                    <div className="flex flex-wrap items-center gap-3">
-                        <div>
-                            <label className="text-xs text-foreground/60 block mb-1">开始日期</label>
-                            <input
-                                type="date"
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                                className="input px-3 py-1.5 text-sm"
-                            />
-                        </div>
-                        <div>
-                            <label className="text-xs text-foreground/60 block mb-1">结束日期</label>
-                            <input
-                                type="date"
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
-                                className="input px-3 py-1.5 text-sm"
-                            />
-                        </div>
-                        <div className="flex items-end gap-2">
-                            <button onClick={handleFilter} className="btn-primary px-4 py-1.5 text-sm">
-                                筛选
-                            </button>
-                            <button onClick={handleClearFilter} className="btn-secondary px-4 py-1.5 text-sm">
-                                清除
-                            </button>
-                        </div>
-                    </div>
+                {/* Filters - Compact inline */}
+                <div className="flex items-center gap-2 mb-3">
+                    <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="input px-2 py-1.5 text-xs flex-1 min-w-0"
+                    />
+                    <span className="text-foreground/30 text-xs shrink-0">至</span>
+                    <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="input px-2 py-1.5 text-xs flex-1 min-w-0"
+                    />
+                    <button
+                        onClick={handleFilter}
+                        className="px-3 py-1.5 bg-primary text-white text-xs rounded-lg shrink-0"
+                    >
+                        筛选
+                    </button>
+                    {(startDate || endDate) && (
+                        <button
+                            onClick={handleClearFilter}
+                            className="px-2 py-1.5 text-xs text-foreground/50 hover:text-foreground shrink-0"
+                        >
+                            清除
+                        </button>
+                    )}
                 </div>
 
                 {/* Table */}
@@ -141,51 +140,78 @@ export default function SettlementHistoryPage() {
                     ) : records.length === 0 ? (
                         <div className="p-8 text-center text-foreground/40">暂无结算记录</div>
                     ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead className="bg-surface-secondary/50 text-foreground/60 text-xs">
-                                    <tr>
-                                        <th className="px-4 py-3 text-left">结算时间</th>
-                                        <th className="px-4 py-3 text-left">代理商</th>
-                                        <th className="px-4 py-3 text-right">金额</th>
-                                        <th className="px-4 py-3 text-center">方式</th>
-                                        <th className="px-4 py-3 text-left">账号</th>
-                                        <th className="px-4 py-3 text-left">流水号/备注</th>
-                                        <th className="px-4 py-3 text-left">经手人</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-border/10">
-                                    {records.map(record => (
-                                        <tr key={record.id} className="hover:bg-surface-secondary/30">
-                                            <td className="px-4 py-3 text-foreground/60 whitespace-nowrap">
-                                                {new Date(record.createdAt).toLocaleString()}
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <div className="font-medium">{record.agent?.realName || '-'}</div>
-                                                <div className="text-xs text-foreground/40">{record.agent?.contact || ''}</div>
-                                            </td>
-                                            <td className="px-4 py-3 text-right font-bold text-green-500">
-                                                ¥{(record.amount / 100).toFixed(2)}
-                                            </td>
-                                            <td className="px-4 py-3 text-center">
-                                                <span className="px-2 py-0.5 bg-primary/10 text-primary rounded text-xs">
-                                                    {METHOD_LABELS[record.method] || record.method}
+                        <>
+                            {/* Mobile Card View */}
+                            <div className="lg:hidden divide-y divide-border/10">
+                                {records.map(record => (
+                                    <div key={record.id} className="p-3">
+                                        <div className="flex items-center justify-between gap-2 mb-1">
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <span className="font-medium text-sm truncate">{record.agent?.realName || '-'}</span>
+                                                <span className="px-1.5 py-0.5 bg-green-500/10 text-green-500 rounded text-xs shrink-0">
+                                                    已结算
                                                 </span>
-                                            </td>
-                                            <td className="px-4 py-3 text-foreground/60 max-w-[150px] truncate">
+                                            </div>
+                                            <span className="font-bold text-green-500 shrink-0">¥{(record.amount / 100).toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between gap-2 text-xs text-foreground/50">
+                                            <span>{new Date(record.createdAt).toLocaleDateString()}</span>
+                                            <span className="truncate">
+                                                <span className="text-blue-400 mr-1">{METHOD_LABELS[record.method] || record.method}</span>
                                                 {record.account}
-                                            </td>
-                                            <td className="px-4 py-3 text-foreground/60 max-w-[150px] truncate">
-                                                {record.transactionId || record.note || '-'}
-                                            </td>
-                                            <td className="px-4 py-3 text-foreground/60">
-                                                {record.admin?.nickname || record.admin?.username || '-'}
-                                            </td>
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Desktop Table View */}
+                            <div className="hidden lg:block overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-surface-secondary/50 text-foreground/60 text-xs">
+                                        <tr>
+                                            <th className="px-4 py-3 text-left">结算时间</th>
+                                            <th className="px-4 py-3 text-left">代理商</th>
+                                            <th className="px-4 py-3 text-right">金额</th>
+                                            <th className="px-4 py-3 text-center">方式</th>
+                                            <th className="px-4 py-3 text-left">账号</th>
+                                            <th className="px-4 py-3 text-left">流水号/备注</th>
+                                            <th className="px-4 py-3 text-left">经手人</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                    </thead>
+                                    <tbody className="divide-y divide-border/10">
+                                        {records.map(record => (
+                                            <tr key={record.id} className="hover:bg-surface-secondary/30">
+                                                <td className="px-4 py-3 text-foreground/60 whitespace-nowrap">
+                                                    {new Date(record.createdAt).toLocaleString()}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <div className="font-medium">{record.agent?.realName || '-'}</div>
+                                                    <div className="text-xs text-foreground/40">{record.agent?.contact || ''}</div>
+                                                </td>
+                                                <td className="px-4 py-3 text-right font-bold text-green-500">
+                                                    ¥{(record.amount / 100).toFixed(2)}
+                                                </td>
+                                                <td className="px-4 py-3 text-center">
+                                                    <span className="px-2 py-0.5 bg-primary/10 text-primary rounded text-xs">
+                                                        {METHOD_LABELS[record.method] || record.method}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 text-foreground/60 max-w-[150px] truncate">
+                                                    {record.account}
+                                                </td>
+                                                <td className="px-4 py-3 text-foreground/60 max-w-[150px] truncate">
+                                                    {record.transactionId || record.note || '-'}
+                                                </td>
+                                                <td className="px-4 py-3 text-foreground/60">
+                                                    {record.admin?.nickname || record.admin?.username || '-'}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </>
                     )}
 
                     {/* Pagination */}

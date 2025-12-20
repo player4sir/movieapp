@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/hooks';
+import { useAdminAuth } from '@/contexts/AdminAuthContext';
 import { PageHeader } from '@/components/admin';
 
 interface AgentSettlementCandidate {
@@ -17,7 +17,7 @@ interface AgentSettlementCandidate {
 }
 
 export default function AdminSettlementsPage() {
-    const { getAccessToken } = useAuth();
+    const { getAccessToken } = useAdminAuth();
     const [agents, setAgents] = useState<AgentSettlementCandidate[]>([]);
     const [loading, setLoading] = useState(true);
     const [settlingAgent, setSettlingAgent] = useState<AgentSettlementCandidate | null>(null);
@@ -106,35 +106,80 @@ export default function AdminSettlementsPage() {
 
                 {loading ? (
                     <div className="text-center py-10">加载中...</div>
+                ) : agents.length === 0 ? (
+                    <div className="py-16 text-center text-foreground/40">
+                        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-500/10 flex items-center justify-center">
+                            <svg className="w-8 h-8 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                        <div>暂无待结算代理商</div>
+                        <div className="text-xs mt-1">所有代理商余额已清零</div>
+                    </div>
                 ) : (
-                    <div className="bg-surface rounded-xl border border-white/5 overflow-hidden">
-                        <table className="w-full text-left">
-                            <thead className="bg-white/5 text-xs text-foreground/60 uppercase">
-                                <tr>
-                                    <th className="p-4">代理商</th>
-                                    <th className="p-4">此期间收入</th>
-                                    <th className="p-4">当前余额(元)</th>
-                                    <th className="p-4">收款信息</th>
-                                    <th className="p-4 text-right">操作</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-white/5">
-                                {agents.length === 0 ? (
+                    <>
+                        {/* Mobile Card View - Compact */}
+                        <div className="lg:hidden space-y-2">
+                            {agents.map(agent => (
+                                <div key={agent.userId} className="bg-surface rounded-lg border border-border/30 p-3">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-medium text-sm truncate">{agent.realName || '未实名'}</span>
+                                                <span className="px-1.5 py-0.5 bg-primary/10 text-primary rounded text-xs shrink-0">
+                                                    {agent.level.name}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-3 mt-1 text-xs text-foreground/50">
+                                                <span>余额 <span className="text-primary font-medium">¥{(agent.balance / 100).toFixed(2)}</span></span>
+                                                {agent.paymentMethod ? (
+                                                    <span className="truncate">
+                                                        <span className="text-blue-400">{agent.paymentMethod === 'kangxun' ? '康讯' : agent.paymentMethod}</span>
+                                                        <span className="text-foreground/40 ml-1">{agent.paymentAccount}</span>
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-red-400">未设置收款</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => openSettleModal(agent)}
+                                            disabled={agent.balance <= 0 || !agent.paymentMethod}
+                                            className="px-3 py-1.5 bg-primary text-white text-xs font-medium rounded-lg shrink-0 disabled:opacity-50"
+                                        >
+                                            结算
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Desktop Table View */}
+                        <div className="hidden lg:block bg-surface rounded-xl border border-border/30 overflow-hidden">
+                            <table className="w-full text-left">
+                                <thead className="bg-surface-secondary/30 text-xs text-foreground/60">
                                     <tr>
-                                        <td colSpan={5} className="p-8 text-center text-foreground/40">暂无待结算代理商</td>
+                                        <th className="p-4 font-medium">代理商</th>
+                                        <th className="p-4 font-medium">累计收入</th>
+                                        <th className="p-4 font-medium">当前余额</th>
+                                        <th className="p-4 font-medium">收款信息</th>
+                                        <th className="p-4 text-right font-medium">操作</th>
                                     </tr>
-                                ) : (
-                                    agents.map(agent => (
-                                        <tr key={agent.userId} className="hover:bg-white/5 transition-colors">
+                                </thead>
+                                <tbody className="divide-y divide-border/10">
+                                    {agents.map(agent => (
+                                        <tr key={agent.userId} className="hover:bg-surface-secondary/20">
                                             <td className="p-4">
                                                 <div className="font-medium">{agent.realName || '未实名'}</div>
                                                 <div className="text-xs text-foreground/40">{agent.contact}</div>
-                                                <div className="text-xs text-primary mt-1">{agent.level.name}</div>
+                                                <span className="inline-block mt-1 px-1.5 py-0.5 bg-primary/10 text-primary rounded text-xs">
+                                                    {agent.level.name}
+                                                </span>
                                             </td>
                                             <td className="p-4 text-foreground/60">
                                                 ¥{(agent.totalIncome / 100).toFixed(2)}
                                             </td>
-                                            <td className="p-4 font-bold text-lg">
+                                            <td className="p-4 font-bold text-lg text-primary">
                                                 ¥{(agent.balance / 100).toFixed(2)}
                                             </td>
                                             <td className="p-4 text-sm">
@@ -159,11 +204,11 @@ export default function AdminSettlementsPage() {
                                                 </button>
                                             </td>
                                         </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </>
                 )}
 
                 {/* Settle Modal */}

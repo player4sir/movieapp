@@ -87,6 +87,20 @@ export class AgentProfileRepository extends BaseRepository {
     }
 
     /**
+     * Delete agent profile by User ID
+     */
+    async delete(userId: string): Promise<boolean> {
+        try {
+            const result = await this.db.delete(agentProfiles)
+                .where(eq(agentProfiles.userId, userId))
+                .returning();
+            return result.length > 0;
+        } catch (error) {
+            throw new RepositoryError('Failed to delete agent profile', 'DELETE_ERROR', error);
+        }
+    }
+
+    /**
      * List all agent profiles (for admin)
      */
     async list(params: URLSearchParams | Record<string, string> = {}): Promise<any> {
@@ -113,5 +127,78 @@ export class AgentProfileRepository extends BaseRepository {
         } catch (error) {
             throw new RepositoryError('Failed to list profiles', 'LIST_ERROR', error);
         }
+    }
+
+    /**
+     * Find agent profile by agent code (for invitation)
+     */
+    async findByAgentCode(agentCode: string): Promise<AgentProfile | null> {
+        try {
+            const profile = await this.db.query.agentProfiles.findFirst({
+                where: eq(agentProfiles.agentCode, agentCode),
+                with: { level: true },
+            });
+            return profile ?? null;
+        } catch (error) {
+            throw new RepositoryError('Failed to find agent by code', 'FIND_ERROR', error);
+        }
+    }
+
+    /**
+     * Get sub agents (direct children) of an agent
+     */
+    async getSubAgents(parentAgentId: string): Promise<AgentProfile[]> {
+        try {
+            const data = await this.db.query.agentProfiles.findMany({
+                where: and(
+                    eq(agentProfiles.parentAgentId, parentAgentId),
+                    eq(agentProfiles.status, 'active')
+                ),
+                with: { level: true },
+                orderBy: [desc(agentProfiles.createdAt)],
+            });
+            return data;
+        } catch (error) {
+            throw new RepositoryError('Failed to get sub agents', 'FIND_ERROR', error);
+        }
+    }
+
+    /**
+     * Count total team size (all levels of sub agents)
+     */
+    async getTeamCount(agentId: string): Promise<{ direct: number; total: number }> {
+        try {
+            // Direct sub-agents
+            const directResult = await this.db
+                .select({ count: sql<number>`count(*)::int` })
+                .from(agentProfiles)
+                .where(and(
+                    eq(agentProfiles.parentAgentId, agentId),
+                    eq(agentProfiles.status, 'active')
+                ));
+
+            // All sub-agents (level1 or level2 = agentId)
+            const totalResult = await this.db
+                .select({ count: sql<number>`count(*)::int` })
+                .from(agentProfiles)
+                .where(and(
+                    sql`(${agentProfiles.parentAgentId} = ${agentId} OR ${agentProfiles.level1AgentId} = ${agentId} OR ${agentProfiles.level2AgentId} = ${agentId})`,
+                    eq(agentProfiles.status, 'active')
+                ));
+
+            return {
+                direct: directResult[0]?.count ?? 0,
+                total: totalResult[0]?.count ?? 0,
+            };
+        } catch (error) {
+            throw new RepositoryError('Failed to get team count', 'FIND_ERROR', error);
+        }
+    }
+
+    /**
+     * Update sub-agent commission rate
+     */
+    async updateSubAgentRate(userId: string, subAgentRate: number): Promise<AgentProfile | null> {
+        return this.update(userId, { subAgentRate });
     }
 }

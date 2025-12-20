@@ -27,7 +27,8 @@ import {
     Calendar,
     Settings,
     Copy,
-    CheckCircle2
+    CheckCircle2,
+    UsersRound
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -43,6 +44,12 @@ interface AgentProfile {
     };
     paymentMethod?: 'alipay' | 'wechat' | 'bank' | 'kangxun';
     paymentAccount?: string;
+    // Multi-level referral fields
+    parentAgentId?: string;
+    commissionRate: number;
+    subAgentRate: number;
+    level2AgentId?: string;
+    agentCode?: string;
 }
 
 interface MonthlyStats {
@@ -376,6 +383,24 @@ export default function AgentCenterPage() {
                                         <div className="text-xs text-foreground/50 truncate">分享推广码</div>
                                     </div>
                                 </Link>
+
+                                {/* Team management - only for agents who can invite */}
+                                {!profile.level2AgentId && (
+                                    <Link
+                                        href="/agent/team"
+                                        className="bg-surface hover:bg-surface-secondary rounded-2xl p-4 flex items-center gap-3 active:scale-[0.98] transition-all group"
+                                    >
+                                        <div className="w-11 h-11 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:scale-110 transition-transform">
+                                            <UsersRound className="w-5 h-5" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="font-medium text-sm">我的团队</div>
+                                            <div className="text-xs text-foreground/50 truncate">
+                                                发展下级代理
+                                            </div>
+                                        </div>
+                                    </Link>
+                                )}
 
                                 <button
                                     onClick={() => setShowSettingsModal(true)}
