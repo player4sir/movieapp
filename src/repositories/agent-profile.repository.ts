@@ -165,11 +165,17 @@ export class AgentProfileRepository extends BaseRepository {
 
     /**
      * Count total team size (all levels of sub agents)
+     * Returns level-wise breakdown for three-level referral system
      */
-    async getTeamCount(agentId: string): Promise<{ direct: number; total: number }> {
+    async getTeamCount(agentId: string): Promise<{
+        direct: number;
+        level2: number;
+        level3: number;
+        total: number
+    }> {
         try {
-            // Direct sub-agents
-            const directResult = await this.db
+            // Level 1 (direct sub-agents): parentAgentId = agentId
+            const level1Result = await this.db
                 .select({ count: sql<number>`count(*)::int` })
                 .from(agentProfiles)
                 .where(and(
@@ -177,21 +183,78 @@ export class AgentProfileRepository extends BaseRepository {
                     eq(agentProfiles.status, 'active')
                 ));
 
-            // All sub-agents (level1 or level2 = agentId)
-            const totalResult = await this.db
+            // Level 2 sub-agents: level1AgentId = agentId (but not direct)
+            const level2Result = await this.db
                 .select({ count: sql<number>`count(*)::int` })
                 .from(agentProfiles)
                 .where(and(
-                    sql`(${agentProfiles.parentAgentId} = ${agentId} OR ${agentProfiles.level1AgentId} = ${agentId} OR ${agentProfiles.level2AgentId} = ${agentId})`,
+                    eq(agentProfiles.level1AgentId, agentId),
+                    sql`${agentProfiles.parentAgentId} != ${agentId}`,
                     eq(agentProfiles.status, 'active')
                 ));
 
+            // Level 3 sub-agents: level2AgentId = agentId (grandchildren's children)
+            const level3Result = await this.db
+                .select({ count: sql<number>`count(*)::int` })
+                .from(agentProfiles)
+                .where(and(
+                    eq(agentProfiles.level2AgentId, agentId),
+                    eq(agentProfiles.status, 'active')
+                ));
+
+            const direct = level1Result[0]?.count ?? 0;
+            const level2 = level2Result[0]?.count ?? 0;
+            const level3 = level3Result[0]?.count ?? 0;
+
             return {
-                direct: directResult[0]?.count ?? 0,
-                total: totalResult[0]?.count ?? 0,
+                direct,
+                level2,
+                level3,
+                total: direct + level2 + level3,
             };
         } catch (error) {
             throw new RepositoryError('Failed to get team count', 'FIND_ERROR', error);
+        }
+    }
+
+    /**
+     * Get level 2 sub-agents (sub-agents of direct sub-agents)
+     * These are agents where level1AgentId = agentId but parentAgentId != agentId
+     */
+    async getLevel2Agents(agentId: string): Promise<AgentProfile[]> {
+        try {
+            const data = await this.db.query.agentProfiles.findMany({
+                where: and(
+                    eq(agentProfiles.level1AgentId, agentId),
+                    sql`${agentProfiles.parentAgentId} != ${agentId}`,
+                    eq(agentProfiles.status, 'active')
+                ),
+                with: { level: true },
+                orderBy: [desc(agentProfiles.createdAt)],
+            });
+            return data;
+        } catch (error) {
+            throw new RepositoryError('Failed to get level 2 agents', 'FIND_ERROR', error);
+        }
+    }
+
+    /**
+     * Get level 3 sub-agents (grandchildren's children)
+     * These are agents where level2AgentId = agentId
+     */
+    async getLevel3Agents(agentId: string): Promise<AgentProfile[]> {
+        try {
+            const data = await this.db.query.agentProfiles.findMany({
+                where: and(
+                    eq(agentProfiles.level2AgentId, agentId),
+                    eq(agentProfiles.status, 'active')
+                ),
+                with: { level: true },
+                orderBy: [desc(agentProfiles.createdAt)],
+            });
+            return data;
+        } catch (error) {
+            throw new RepositoryError('Failed to get level 3 agents', 'FIND_ERROR', error);
         }
     }
 

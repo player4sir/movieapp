@@ -195,7 +195,7 @@ export async function setSubAgentRate(userId: string, subAgentRate: number): Pro
  */
 export async function getTeamInfo(userId: string): Promise<{
     subAgents: AgentProfile[];
-    teamCount: { direct: number; total: number };
+    teamCount: { direct: number; level2: number; level3: number; total: number };
 }> {
     const profile = await agentProfileRepository.findByUserId(userId);
     if (!profile) throw { ...AGENT_PROFILE_ERRORS.PROFILE_NOT_FOUND };
