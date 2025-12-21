@@ -27,10 +27,10 @@ export function SupportWidget() {
     const [previewImage, setPreviewImage] = useState<string | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
 
-    // Check if on pages where widget should be hidden (before early return to maintain hook order)
-    const isAdminPage = pathname?.startsWith('/console-x9k2m');
-    const isPlayPage = pathname?.startsWith('/play');
-    const shouldHide = isAdminPage || isPlayPage;
+    // Only show widget on homepage and adult/welfare page
+    const isHomePage = pathname === '/';
+    const isAdultPage = pathname === '/adult';
+    const shouldHide = !(isHomePage || isAdultPage);
 
     // Parse FAQ config
     const faqList: FAQItem[] = settings.faq_config
