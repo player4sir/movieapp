@@ -255,7 +255,7 @@ export default function AgentCenterPage() {
                             </div>
                             <div className="bg-surface rounded-xl p-3 text-center">
                                 <div className="text-xl font-bold text-green-400">¥{((stats?.thisMonth.totalEarnings ?? 0) / 100).toFixed(0)}</div>
-                                <div className="text-xs text-foreground/50">本月收益</div>
+                                <div className="text-xs text-foreground/50">本月佣金</div>
                             </div>
                             <div className="bg-surface rounded-xl p-3 text-center">
                                 <div className="text-xl font-bold text-primary">{((profile.commissionRate ?? 0) / 100).toFixed(0)}%</div>
@@ -342,7 +342,7 @@ export default function AgentCenterPage() {
                         {/* Table Header */}
                         <div className="grid grid-cols-4 px-4 py-2 bg-white/5 text-xs text-foreground/50">
                             <div>用户名</div>
-                            <div className="text-right">收益</div>
+                            <div className="text-right">佣金</div>
                             <div className="text-right">团队人数</div>
                             <div className="text-right">注册时间</div>
                         </div>

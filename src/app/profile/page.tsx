@@ -77,6 +77,7 @@ export default function ProfilePage() {
   const [debugClicks, setDebugClicks] = useState(0);
   // Agent status - must be declared with other hooks before any conditional returns
   const [agentStatus, setAgentStatus] = useState<'none' | 'pending' | 'active' | 'rejected'>('none');
+  const [agentCommissionRate, setAgentCommissionRate] = useState<number>(0);
 
   // Fetch membership status using subscription API (includes group permissions)
   useEffect(() => {
@@ -128,6 +129,7 @@ export default function ProfilePage() {
       .then(res => {
         if (res.data) {
           setAgentStatus(res.data.status);
+          setAgentCommissionRate(res.data.commissionRate || 0);
         } else {
           setAgentStatus('none');
         }
@@ -321,22 +323,19 @@ export default function ProfilePage() {
                     label="观看历史"
                   />
                   {/* Agent Entry */}
-                  {agentStatus === 'active' ? (
-                    <MenuItem
-                      href="/agent"
-                      icon={Briefcase}
-                      label="代理中心"
-                      badge="赚收益"
-                    />
-                  ) : (
-                    <MenuItem
-                      href={agentStatus === 'pending' ? '#' : '/agent/apply'} // Pending state could show a toast or simplified status
-                      onClick={agentStatus === 'pending' ? () => alert('您的申请正在审核中') : undefined}
-                      icon={Briefcase}
-                      label="成为合伙人"
-                      badge={agentStatus === 'pending' ? '审核中' : 'Hot'}
-                    />
-                  )}
+                  <MenuItem
+                    href={agentStatus === 'pending' ? '#' : agentStatus === 'active' ? '/agent' : '/agent/apply'}
+                    onClick={agentStatus === 'pending' ? () => alert('您的申请正在审核中') : undefined}
+                    icon={Briefcase}
+                    label="代理中心"
+                    badge={
+                      agentStatus === 'active'
+                        ? `我的返佣${(agentCommissionRate / 100).toFixed(0)}%`
+                        : agentStatus === 'pending'
+                          ? '审核中'
+                          : '最高返佣50%'
+                    }
+                  />
                 </div>
               </div>
 
