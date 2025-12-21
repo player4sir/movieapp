@@ -155,21 +155,20 @@ export function SplashAd({
     };
   }, [imageLoaded, ad, skipDelay]); // Remove onClose from deps
 
-  // Handle ad click
-  const handleClick = useCallback(async () => {
+  // Handle ad click - iOS fix: open window FIRST synchronously
+  const handleClick = useCallback(() => {
     if (!ad || !slotId) return;
 
-    // Record click
-    try {
-      await fetch('/api/ads/click', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adId: ad.id, slotId }),
-      });
-    } catch { }
-
-    // Open target URL
+    // iOS Safari blocks window.open() after async operations
+    // Open target URL synchronously FIRST
     window.open(ad.targetUrl, '_blank', 'noopener,noreferrer');
+
+    // Record click asynchronously (fire-and-forget)
+    fetch('/api/ads/click', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adId: ad.id, slotId }),
+    }).catch(() => { });
   }, [ad, slotId]);
 
   // Handle skip

@@ -98,7 +98,8 @@ export const AdBanner = memo(function AdBanner({
   }, [ad.id, slotId, onImpression]);
 
   // Handle click with tracking and debounce (Requirements: 3.3)
-  const handleClick = useCallback(async (e: React.MouseEvent) => {
+  // iOS fix: Open window FIRST (sync) before async fetch to avoid popup blocking
+  const handleClick = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
 
     // Prevent double clicks
@@ -107,31 +108,24 @@ export const AdBanner = memo(function AdBanner({
 
     onClick?.();
 
-    try {
-      const response = await fetch('/api/ads/click', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adId: ad.id, slotId }),
-      });
+    // iOS Safari blocks window.open() after async operations
+    // So we MUST open the window synchronously in the click handler
+    const targetUrl = ad.targetUrl;
+    window.open(targetUrl, '_blank', 'noopener,noreferrer');
 
-      const data = await response.json();
+    // Track click asynchronously (fire-and-forget)
+    fetch('/api/ads/click', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adId: ad.id, slotId }),
+    }).catch(() => {
+      // Silently ignore click tracking errors
+    });
 
-      // Redirect to target URL
-      if (data.targetUrl) {
-        window.open(data.targetUrl, '_blank', 'noopener,noreferrer');
-      } else {
-        // Fallback to ad's target URL
-        window.open(ad.targetUrl, '_blank', 'noopener,noreferrer');
-      }
-    } catch {
-      // On error, still redirect using the ad's target URL
-      window.open(ad.targetUrl, '_blank', 'noopener,noreferrer');
-    } finally {
-      // Reset click lock after a short delay
-      setTimeout(() => {
-        clickInProgress.current = false;
-      }, 1000);
-    }
+    // Reset click lock after a short delay
+    setTimeout(() => {
+      clickInProgress.current = false;
+    }, 1000);
   }, [ad.id, ad.targetUrl, slotId, onClick]);
 
   // Handle image error with retry

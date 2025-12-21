@@ -254,7 +254,7 @@ export default function AgentCenterPage() {
                                 <div className="text-xs text-foreground/50">团队人数</div>
                             </div>
                             <div className="bg-surface rounded-xl p-3 text-center">
-                                <div className="text-xl font-bold text-green-400">¥{((stats?.thisMonth.totalEarnings ?? 0) / 100).toFixed(0)}</div>
+                                <div className="text-xl font-bold text-green-400">¥{((stats?.thisMonth.totalEarnings ?? 0) / 100).toFixed(2)}</div>
                                 <div className="text-xs text-foreground/50">本月佣金</div>
                             </div>
                             <div className="bg-surface rounded-xl p-3 text-center">

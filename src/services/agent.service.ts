@@ -377,8 +377,8 @@ export async function processOrderCommission(
         console.log(`[Commission L3] Agent ${directAgent.userId}: ¥${directCommission / 100} (direct ${directAgent.commissionRate / 100}%)`);
     }
 
-    // Update/Create monthly record for direct agent
-    await updateOrCreateAgentRecord(directAgent, orderAmountYuan, month);
+    // Update/Create monthly record for direct agent with actual commission
+    await updateOrCreateAgentRecord(directAgent, orderAmountYuan, directCommission, month);
 
     // Level 2 (Parent Agent) - gets their commissionRate minus what they gave to child
     if (directAgent.parentAgentId) {
@@ -419,20 +419,31 @@ export async function processOrderCommission(
 }
 
 /**
- * Helper: Update or create agent monthly record
+ * Helper: Update or create agent monthly record with ACTUAL commission (not recalculated)
  */
 async function updateOrCreateAgentRecord(
     agent: { userId: string; realName: string; contact: string; levelId: string },
     orderAmountYuan: number,
+    actualCommission: number, // in cents - the actual amount added to profile
     month: string
 ): Promise<void> {
     const existingRecord = await agentRecordRepository.findByUserIdAndMonth(agent.userId, month);
 
     if (existingRecord) {
+        // Directly update without recalculating - add to existing values
         const newTotalSales = existingRecord.totalSales + Math.floor(orderAmountYuan);
-        await updateAgentRecord(existingRecord.id, { totalSales: newTotalSales });
+        const newTotalEarnings = existingRecord.totalEarnings + actualCommission;
+        const newCommissionAmount = existingRecord.commissionAmount + actualCommission;
+
+        await agentRecordRepository.update(existingRecord.id, {
+            totalSales: newTotalSales,
+            totalEarnings: newTotalEarnings,
+            commissionAmount: newCommissionAmount,
+        });
     } else {
-        await createAgentRecord({
+        // Create new record with actual commission
+        await agentRecordRepository.create({
+            id: crypto.randomUUID(),
             agentName: agent.realName || 'Agent',
             agentContact: agent.contact || '',
             levelId: agent.levelId,
@@ -440,6 +451,9 @@ async function updateOrCreateAgentRecord(
             recruitCount: 0,
             dailySales: 0,
             totalSales: Math.floor(orderAmountYuan),
+            commissionAmount: actualCommission,
+            bonusAmount: 0,
+            totalEarnings: actualCommission,
             userId: agent.userId,
             status: 'pending',
         });
