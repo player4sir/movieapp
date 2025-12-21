@@ -5,8 +5,9 @@
  * Clean, responsive design for desktop and mobile
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
 import { useToast } from '@/components/admin';
@@ -50,6 +51,7 @@ const quickLinks = [
 export default function AgentManagementPage() {
     const { getAccessToken } = useAdminAuth();
     const { showToast } = useToast();
+    const searchParams = useSearchParams();
     const [activeTab, setActiveTab] = useState<TabType>('list');
     const [showQuickMenu, setShowQuickMenu] = useState(false);
 
@@ -91,6 +93,25 @@ export default function AgentManagementPage() {
 
     const pendingProfiles = pendingData?.data || [];
     const activeProfiles = activeData?.data || [];
+
+    // Auto-open edit modal from URL param (from detail page quick edit)
+    useEffect(() => {
+        const editUserId = searchParams.get('edit');
+        if (editUserId && activeProfiles.length > 0) {
+            const profile = activeProfiles.find(p => p.userId === editUserId);
+            if (profile && !isEditOpen) {
+                setEditingProfile(profile);
+                setEditFormData({
+                    realName: profile.realName,
+                    contact: profile.contact,
+                    levelId: profile.levelId,
+                    status: profile.status,
+                    commissionRate: profile.commissionRate ?? 1000,
+                });
+                setIsEditOpen(true);
+            }
+        }
+    }, [searchParams, activeProfiles, isEditOpen]);
 
     const handleAction = async (userId: string, action: 'approve' | 'reject') => {
         if (!confirm(`确定${action === 'approve' ? '通过' : '拒绝'}申请？`)) return;

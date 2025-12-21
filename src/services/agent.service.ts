@@ -360,61 +360,85 @@ export async function processOrderCommission(
 
     // 2. Get Direct Agent Profile (Level 3 - closest to user)
     const directAgent = await getAgentProfile(referrerId);
-    if (!directAgent || directAgent.status !== 'active') {
-        return; // Referrer is not an active agent
+    if (!directAgent) {
+        return; // Referrer not found
     }
 
     const orderAmountYuan = orderAmount / 100;
     const month = getCurrentMonth();
 
-    // 3. Calculate and distribute commissions for up to 3 levels
+    // 3. Build agent chain by traversing parentAgentId (up to 3 levels)
+    // This allows UNLIMITED tree depth, but only 3 levels get commission per transaction
+    type AgentInChain = {
+        profile: typeof directAgent;
+        level: number; // 1 = direct, 2 = parent, 3 = grandparent
+        rate: number; // Commission rate for this agent
+        commission: number; // Calculated commission
+    };
 
-    // Level 3 (Direct Agent) - gets their full commissionRate
-    const directCommission = Math.floor(orderAmount * directAgent.commissionRate / 10000);
+    const agentChain: AgentInChain[] = [];
+    let currentAgent: typeof directAgent | null = directAgent;
+    let levelCount = 0;
+    let accumulatedPassThrough = 0;
+    const MAX_LEVELS = 3;
 
-    if (directCommission > 0) {
-        await agentProfileRepository.addIncome(directAgent.userId, directCommission);
-        console.log(`[Commission L3] Agent ${directAgent.userId}: ¥${directCommission / 100} (direct ${directAgent.commissionRate / 100}%)`);
-    }
+    while (currentAgent && levelCount < MAX_LEVELS) {
+        levelCount++;
 
-    // Update/Create monthly record for direct agent with actual commission
-    await updateOrCreateAgentRecord(directAgent, orderAmountYuan, directCommission, month);
+        // Calculate this agent's rate
+        // Level 1 (direct) gets their full commissionRate
+        // Level 2+ gets (commissionRate - subAgentRate) + any pass-through
+        let agentRate: number;
+        if (levelCount === 1) {
+            agentRate = currentAgent.commissionRate;
+        } else {
+            agentRate = currentAgent.commissionRate - currentAgent.subAgentRate;
+        }
+        agentRate += accumulatedPassThrough;
 
-    // Level 2 (Parent Agent) - gets their commissionRate minus what they gave to child
-    if (directAgent.parentAgentId) {
-        const level2Agent = await getAgentProfile(directAgent.parentAgentId);
-        if (level2Agent && level2Agent.status === 'active') {
-            // Level 2 earns the difference between their rate and what they gave to Level 3
-            const level2Rate = level2Agent.commissionRate - level2Agent.subAgentRate;
-            const level2Commission = Math.floor(orderAmount * level2Rate / 10000);
+        if (currentAgent.status === 'active') {
+            const commission = Math.floor(orderAmount * agentRate / 10000);
+            agentChain.push({
+                profile: currentAgent,
+                level: levelCount,
+                rate: agentRate,
+                commission: commission,
+            });
+            accumulatedPassThrough = 0; // Reset after distribution
+        } else {
+            // Agent is disabled - pass through their portion to the next level up
+            accumulatedPassThrough = agentRate;
+            console.log(`[Commission] Level ${levelCount} Agent ${currentAgent.userId} is disabled, commission will pass through`);
+        }
 
-            if (level2Commission > 0) {
-                await agentProfileRepository.addIncome(level2Agent.userId, level2Commission);
-                console.log(`[Commission L2] Agent ${level2Agent.userId}: ¥${level2Commission / 100} (indirect ${level2Rate / 100}%)`);
-            }
-
-            // Level 1 (Top Agent) - gets their rate minus what they gave to Level 2
-            if (level2Agent.parentAgentId) {
-                const level1Agent = await getAgentProfile(level2Agent.parentAgentId);
-                if (level1Agent && level1Agent.status === 'active') {
-                    const level1Rate = level1Agent.commissionRate - level1Agent.subAgentRate;
-                    const level1Commission = Math.floor(orderAmount * level1Rate / 10000);
-
-                    if (level1Commission > 0) {
-                        await agentProfileRepository.addIncome(level1Agent.userId, level1Commission);
-                        console.log(`[Commission L1] Agent ${level1Agent.userId}: ¥${level1Commission / 100} (indirect ${level1Rate / 100}%)`);
-                    }
-                }
-            }
+        // Move to parent agent
+        if (currentAgent.parentAgentId) {
+            currentAgent = await getAgentProfile(currentAgent.parentAgentId);
+        } else {
+            break; // No more parents
         }
     }
 
-    // 4. Check for level upgrade
-    try {
-        const { checkAndUpgradeLevel } = await import('./agent-profile.service');
-        await checkAndUpgradeLevel(referrerId);
-    } catch (error) {
-        console.error('Failed to check agent level upgrade:', error);
+    // 4. Distribute commissions and record monthly data for ALL agents in chain
+    for (const agent of agentChain) {
+        if (agent.commission > 0) {
+            // Add income to profile
+            await agentProfileRepository.addIncome(agent.profile.userId, agent.commission);
+            console.log(`[Commission L${agent.level}] Agent ${agent.profile.userId}: ¥${agent.commission / 100} (rate ${agent.rate / 100}%)`);
+
+            // Record to monthly report
+            await updateOrCreateAgentRecord(agent.profile, orderAmountYuan, agent.commission, month);
+        }
+    }
+
+    // 5. Check for level upgrade (only for direct agent)
+    if (directAgent.status === 'active') {
+        try {
+            const { checkAndUpgradeLevel } = await import('./agent-profile.service');
+            await checkAndUpgradeLevel(referrerId);
+        } catch (error) {
+            console.error('Failed to check agent level upgrade:', error);
+        }
     }
 }
 

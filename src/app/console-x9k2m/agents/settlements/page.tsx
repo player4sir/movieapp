@@ -19,6 +19,7 @@ export default function AdminSettlementsPage() {
     const { getAccessToken } = useAdminAuth();
     const [agents, setAgents] = useState<AgentSettlementCandidate[]>([]);
     const [loading, setLoading] = useState(true);
+    const [minSettlementAmount, setMinSettlementAmount] = useState(1000); // Default 10 yuan
     const [settlingAgent, setSettlingAgent] = useState<AgentSettlementCandidate | null>(null);
     const [settleForm, setSettleForm] = useState({
         amount: 0,
@@ -26,6 +27,26 @@ export default function AdminSettlementsPage() {
         note: ''
     });
     const [submitting, setSubmitting] = useState(false);
+
+    // Fetch agent config to get minWithdrawAmount
+    useEffect(() => {
+        async function fetchConfig() {
+            const token = getAccessToken();
+            if (!token) return;
+            try {
+                const res = await fetch('/api/admin/agent-config', {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (data?.data?.minWithdrawAmount) {
+                    setMinSettlementAmount(data.data.minWithdrawAmount);
+                }
+            } catch (e) {
+                console.error('Failed to fetch agent config:', e);
+            }
+        }
+        fetchConfig();
+    }, [getAccessToken]);
 
     const fetchAgents = useCallback(async () => {
         setLoading(true);
@@ -141,13 +162,18 @@ export default function AdminSettlementsPage() {
                                                 )}
                                             </div>
                                         </div>
-                                        <button
-                                            onClick={() => openSettleModal(agent)}
-                                            disabled={agent.balance <= 0 || !agent.paymentMethod}
-                                            className="px-3 py-1.5 bg-primary text-white text-xs font-medium rounded-lg shrink-0 disabled:opacity-50"
-                                        >
-                                            结算
-                                        </button>
+                                        {agent.balance < minSettlementAmount ? (
+                                            <span className="px-3 py-1.5 text-xs text-foreground/40">未满 ¥{minSettlementAmount / 100}</span>
+                                        ) : !agent.paymentMethod ? (
+                                            <span className="px-3 py-1.5 text-xs text-red-400">未设收款</span>
+                                        ) : (
+                                            <button
+                                                onClick={() => openSettleModal(agent)}
+                                                className="px-3 py-1.5 bg-primary text-white text-xs font-medium rounded-lg shrink-0"
+                                            >
+                                                结算
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             ))}
@@ -194,13 +220,18 @@ export default function AdminSettlementsPage() {
                                                 )}
                                             </td>
                                             <td className="p-4 text-right">
-                                                <button
-                                                    onClick={() => openSettleModal(agent)}
-                                                    disabled={agent.balance <= 0 || !agent.paymentMethod}
-                                                    className="px-4 py-2 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                >
-                                                    结算
-                                                </button>
+                                                {agent.balance < minSettlementAmount ? (
+                                                    <span className="text-foreground/40 text-sm">未满 ¥{minSettlementAmount / 100}</span>
+                                                ) : !agent.paymentMethod ? (
+                                                    <span className="text-red-400 text-sm">未设收款信息</span>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => openSettleModal(agent)}
+                                                        className="px-4 py-2 bg-primary text-white text-sm rounded-lg hover:bg-primary/90"
+                                                    >
+                                                        结算
+                                                    </button>
+                                                )}
                                             </td>
                                         </tr>
                                     ))}

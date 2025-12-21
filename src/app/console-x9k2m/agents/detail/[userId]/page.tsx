@@ -143,6 +143,13 @@ export default function AgentDetailPage({ params }: { params: Promise<{ userId: 
                                 {profile.agentCode && <span>推广码: {profile.agentCode}</span>}
                             </div>
                         </div>
+                        {/* Quick Edit Button */}
+                        <button
+                            onClick={() => router.push(`/console-x9k2m/agents?edit=${userId}`)}
+                            className="px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-xs text-foreground/60 transition-colors shrink-0"
+                        >
+                            编辑
+                        </button>
                     </div>
                 </div>
 
@@ -175,8 +182,8 @@ export default function AgentDetailPage({ params }: { params: Promise<{ userId: 
                                 key={tab.key}
                                 onClick={() => setActiveTab(tab.key)}
                                 className={`flex-1 px-3 py-3 text-sm font-medium transition-colors relative ${activeTab === tab.key
-                                        ? 'text-primary'
-                                        : 'text-foreground/50 hover:text-foreground/80'
+                                    ? 'text-primary'
+                                    : 'text-foreground/50 hover:text-foreground/80'
                                     }`}
                             >
                                 {tab.label}
@@ -231,8 +238,8 @@ export default function AgentDetailPage({ params }: { params: Promise<{ userId: 
                                                 <div className="text-xs text-foreground/40">{new Date(user.createdAt).toLocaleDateString()}</div>
                                             </div>
                                             <span className={`px-2 py-0.5 rounded text-xs shrink-0 ${user.memberLevel === 'svip' ? 'bg-purple-500/20 text-purple-400' :
-                                                    user.memberLevel === 'vip' ? 'bg-yellow-500/20 text-yellow-400' :
-                                                        'bg-gray-500/20 text-gray-400'
+                                                user.memberLevel === 'vip' ? 'bg-yellow-500/20 text-yellow-400' :
+                                                    'bg-gray-500/20 text-gray-400'
                                                 }`}>
                                                 {user.memberLevel.toUpperCase()}
                                             </span>

@@ -3,16 +3,28 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, isAuthError } from '@/lib/auth-middleware';
 import { AgentProfileRepository, SettlementRecordRepository } from '@/repositories';
 import { z } from 'zod';
+import { db } from '@/db';
+import { siteSettings } from '@/db/schema';
+import { eq } from 'drizzle-orm';
 
 const agentProfileRepository = new AgentProfileRepository();
 const settlementRecordRepository = new SettlementRecordRepository();
 
-const settleSchema = z.object({
-    userId: z.string().min(1),
-    amount: z.number().int().positive(),
-    transactionId: z.string().optional(),
-    note: z.string().optional(),
-});
+// Helper to get min withdraw amount from config
+async function getMinWithdrawAmount(): Promise<number> {
+    try {
+        const setting = await db.query.siteSettings.findFirst({
+            where: eq(siteSettings.key, 'agent_system_config'),
+        });
+        if (setting) {
+            const config = JSON.parse(setting.value);
+            return config.minWithdrawAmount || 1000;
+        }
+    } catch (e) {
+        console.error('Failed to get minWithdrawAmount:', e);
+    }
+    return 1000; // Default 10 yuan
+}
 
 // GET: List agents with balance > 0 (candidates for settlement)
 export async function GET(req: NextRequest) {
@@ -70,6 +82,18 @@ export async function POST(req: NextRequest) {
 
     try {
         const body = await req.json();
+
+        // Get min withdraw amount from config
+        const minWithdrawAmount = await getMinWithdrawAmount();
+
+        // Create schema with dynamic min value
+        const settleSchema = z.object({
+            userId: z.string().min(1),
+            amount: z.number().int().min(minWithdrawAmount, `最低结算金额为 ¥${minWithdrawAmount / 100}`),
+            transactionId: z.string().optional(),
+            note: z.string().optional(),
+        });
+
         const validation = settleSchema.safeParse(body);
 
         if (!validation.success) {
