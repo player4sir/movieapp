@@ -86,26 +86,31 @@ export async function applyForAgent(
     if (data.inviteCode) {
         const parentAgent = await agentProfileRepository.findByAgentCode(data.inviteCode);
         if (parentAgent && parentAgent.status === 'active') {
-            // Validate that parent has set a subAgentRate
+            // Always bind parent-child relationship
+            parentAgentId = parentAgent.userId;
+            
+            // Use parent's subAgentRate if set, otherwise default to 10% (1000 basis points)
             if (parentAgent.subAgentRate > 0) {
-                parentAgentId = parentAgent.userId;
-                commissionRate = parentAgent.subAgentRate; // Inherit rate from parent
+                commissionRate = parentAgent.subAgentRate;
+            } else {
+                // Default commission rate for sub-agents when parent hasn't set subAgentRate
+                commissionRate = 1000; // 10%
+            }
 
-                // Build the relationship chain
-                if (parentAgent.level1AgentId) {
-                    // Parent is Level 3, this agent would be Level 4 (not allowed in 3-tier system)
-                    // Treat parent as Level 2, grandparent as Level 1
-                    level1AgentId = parentAgent.level1AgentId;
-                    level2AgentId = parentAgent.userId;
-                } else if (parentAgent.parentAgentId) {
-                    // Parent is Level 2, grandparent is Level 1
-                    level1AgentId = parentAgent.parentAgentId;
-                    level2AgentId = parentAgent.userId;
-                } else {
-                    // Parent is Level 1 (top agent)
-                    level1AgentId = parentAgent.userId;
-                    level2AgentId = null;
-                }
+            // Build the relationship chain
+            if (parentAgent.level1AgentId) {
+                // Parent is Level 3, this agent would be Level 4 (not allowed in 3-tier system)
+                // Treat parent as Level 2, grandparent as Level 1
+                level1AgentId = parentAgent.level1AgentId;
+                level2AgentId = parentAgent.userId;
+            } else if (parentAgent.parentAgentId) {
+                // Parent is Level 2, grandparent is Level 1
+                level1AgentId = parentAgent.parentAgentId;
+                level2AgentId = parentAgent.userId;
+            } else {
+                // Parent is Level 1 (top agent)
+                level1AgentId = parentAgent.userId;
+                level2AgentId = null;
             }
         }
     }
