@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, isAuthError } from '@/lib/auth-middleware';
 import { db } from '@/db';
-import { agentProfiles, agentLevels, agentRecords } from '@/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { agentProfiles } from '@/db/schema';
+import { eq } from 'drizzle-orm';
 
 // GET: Get current user's agent profile
 export async function GET(req: NextRequest) {
@@ -55,8 +55,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
             message: inviteCode ? '申请已提交（已绑定上级代理）' : '申请已提交'
         });
-    } catch (error: any) {
-        if (error.code === 'PROFILE_EXISTS') {
+    } catch (error) {
+        const err = error as { code?: string; message?: string };
+        if (err.code === 'PROFILE_EXISTS') {
             // Check specific status
             const existing = await db.query.agentProfiles.findFirst({
                 where: eq(agentProfiles.userId, userId),
@@ -68,7 +69,7 @@ export async function POST(req: NextRequest) {
                 return NextResponse.json({ message: '申请已提交，请耐心等待审核' }, { status: 400 });
             }
         }
-        return NextResponse.json({ message: error.message || '申请失败' }, { status: 500 });
+        const message = err.message || '申请失败';
+        return NextResponse.json({ message }, { status: 500 });
     }
 }
-

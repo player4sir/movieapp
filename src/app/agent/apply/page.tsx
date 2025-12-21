@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks';
-import { Sidebar } from '@/components/layout/Sidebar';
+
 import { ChevronLeft, CheckCircle2, UserPlus } from 'lucide-react';
 
-export default function AgentApplyPage() {
+function AgentApplyContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { getAccessToken } = useAuth();
@@ -51,7 +51,7 @@ export default function AgentApplyPage() {
                 const data = await res.json();
                 setError(data.message || '申请提交失败');
             }
-        } catch (err) {
+        } catch {
             setError('网络错误，请稍后重试');
         } finally {
             setSubmitting(false);
@@ -165,3 +165,10 @@ export default function AgentApplyPage() {
     );
 }
 
+export default function AgentApplyPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen bg-background animate-pulse" />}>
+            <AgentApplyContent />
+        </Suspense>
+    );
+}

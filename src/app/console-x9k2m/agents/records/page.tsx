@@ -160,7 +160,7 @@ export default function AgentRecordsPage() {
             await fetch(`/api/admin/agents/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
             showToast({ message: '已删除', type: 'success' });
             mutateRecords();
-        } catch (e) {
+        } catch {
             showToast({ message: '删除失败', type: 'error' });
         }
     };

@@ -6,8 +6,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, isAuthError } from '@/lib/auth-middleware';
 import { db } from '@/db';
-import { agentProfiles, agentLevels, agentRecords, users, settlementRecords } from '@/db/schema';
-import { eq, desc, sql, and, gte } from 'drizzle-orm';
+import { agentProfiles, agentRecords, users, settlementRecords } from '@/db/schema';
+import { eq, desc, sql } from 'drizzle-orm';
 
 export async function GET(
     request: NextRequest,

@@ -34,13 +34,14 @@ export async function GET(request: NextRequest) {
         const level2Agents = await agentProfileRepository.getLevel2Agents(userId);
         const level3Agents = await agentProfileRepository.getLevel3Agents(userId);
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const mapAgent = (a: any) => ({
             userId: a.userId,
             realName: a.realName,
             contact: a.contact,
             commissionRate: a.commissionRate,
             totalIncome: a.totalIncome,
-            createdAt: a.createdAt,
+            createdAt: a.createdAt instanceof Date ? a.createdAt.toISOString() : a.createdAt,
             parentAgentId: a.parentAgentId,
         });
 
@@ -54,9 +55,10 @@ export async function GET(request: NextRequest) {
             canInvite: !profile.level2AgentId, // Level 3 agents cannot invite
             inviteCode: profile.agentCode,
         });
-    } catch (error: any) {
+    } catch (error) {
         console.error('Get team error:', error);
-        return NextResponse.json({ error: error.message || '获取团队信息失败' }, { status: 500 });
+        const message = error instanceof Error ? error.message : '获取团队信息失败';
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }
 
@@ -123,9 +125,9 @@ export async function PUT(request: NextRequest) {
         }
 
         return NextResponse.json({ error: '参数错误' }, { status: 400 });
-    } catch (error: any) {
+    } catch (error) {
         console.error('Update commission rate error:', error);
-        return NextResponse.json({ error: error.message || '设置失败' }, { status: 500 });
+        const message = error instanceof Error ? error.message : '设置失败';
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }
-

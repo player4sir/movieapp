@@ -17,7 +17,6 @@ import { BottomNav } from '@/components/layout/BottomNav';
 import {
     ChevronLeft,
     ChevronRight,
-    RefreshCw,
     Settings,
     Copy,
     Check,
@@ -84,7 +83,7 @@ interface TeamData {
 
 export default function AgentCenterPage() {
     const router = useRouter();
-    const { user, isAuthenticated, loading, getAccessToken } = useAuth();
+    const { isAuthenticated, loading, getAccessToken } = useAuth();
     const [profile, setProfile] = useState<AgentProfile | null>(null);
     const [stats, setStats] = useState<MonthlyStats | null>(null);
     const [teamData, setTeamData] = useState<TeamData | null>(null);
@@ -137,8 +136,8 @@ export default function AgentCenterPage() {
                     const teamJson = await teamRes.json();
                     setTeamData(teamJson);
                 }
-            } catch (e) {
-                console.error('Failed to fetch data:', e);
+            } catch (err) {
+                console.error('Failed to fetch data:', err);
             } finally {
                 setFetching(false);
             }
@@ -171,7 +170,7 @@ export default function AgentCenterPage() {
             } else {
                 alert('保存失败');
             }
-        } catch (e) {
+        } catch {
             alert('网络错误');
         } finally {
             setSavingSettings(false);

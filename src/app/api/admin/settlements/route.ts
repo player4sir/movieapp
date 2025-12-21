@@ -26,10 +26,20 @@ export async function GET(req: NextRequest) {
 
     try {
         // Fetch all active agents
-        const { data: profiles } = await agentProfileRepository.list({ status: 'active' } as any);
+        const { data: profiles } = await agentProfileRepository.list({ status: 'active' } as Record<string, string>);
 
         // Filter those with balance > 0
-        const settlableAgents = profiles.filter((p: any) => p.balance > 0).map((p: any) => ({
+        interface AgentProfile {
+            userId: string;
+            realName: string;
+            contact: string;
+            level: unknown;
+            balance: number;
+            totalIncome: number;
+            paymentMethod: string;
+            paymentAccount: string;
+        }
+        const settlableAgents = (profiles as AgentProfile[]).filter((p) => p.balance > 0).map((p) => ({
             userId: p.userId,
             realName: p.realName,
             contact: p.contact,
@@ -88,7 +98,7 @@ export async function POST(req: NextRequest) {
         // Logic: if not set, reject settlement or default to 'bank' + note "MANUAL".
 
         const validMethods = ['alipay', 'wechat', 'bank', 'kangxun'];
-        let method = profile.paymentMethod as 'alipay' | 'wechat' | 'bank' | 'kangxun';
+        const method = profile.paymentMethod as 'alipay' | 'wechat' | 'bank' | 'kangxun';
         if (!method || !validMethods.includes(method)) {
             // This creates a risk if we force a value. BUT we filtered list by existing payment info.
             // Let's assume bank if invalid? Or return error?

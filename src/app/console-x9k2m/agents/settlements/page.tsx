@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
 import { PageHeader } from '@/components/admin';
 
@@ -28,7 +27,7 @@ export default function AdminSettlementsPage() {
     });
     const [submitting, setSubmitting] = useState(false);
 
-    const fetchAgents = async () => {
+    const fetchAgents = useCallback(async () => {
         setLoading(true);
         try {
             const token = getAccessToken();
@@ -45,11 +44,11 @@ export default function AdminSettlementsPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [getAccessToken]);
 
     useEffect(() => {
         fetchAgents();
-    }, []);
+    }, [fetchAgents]);
 
     const openSettleModal = (agent: AgentSettlementCandidate) => {
         setSettlingAgent(agent);
@@ -87,7 +86,7 @@ export default function AdminSettlementsPage() {
                 const err = await res.json();
                 alert(err.error || '结算失败');
             }
-        } catch (error) {
+        } catch {
             alert('请求失败');
         } finally {
             setSubmitting(false);

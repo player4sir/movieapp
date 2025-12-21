@@ -25,7 +25,7 @@ import { UnlockPromptModal } from '@/components/paywall';
 import { AdSlotGroup } from '@/components/ads';
 import { Sidebar } from '@/components/layout';
 import { useVODDetail, useContentAccess, useAuth } from '@/hooks';
-import { Star, Play, ChevronLeft, Layout, List, Share2, ShieldCheck, Crown } from 'lucide-react';
+import { Star, Play, ChevronLeft, List, Share2, ShieldCheck, Crown } from 'lucide-react';
 
 type SourceCategory = 'normal' | 'adult';
 

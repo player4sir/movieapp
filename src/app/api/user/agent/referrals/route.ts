@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, isAuthError } from '@/lib/auth-middleware';
 import { db } from '@/db';
 import { users, agentProfiles, membershipOrders } from '@/db/schema';
-import { eq, desc, sql, and, ne } from 'drizzle-orm';
+import { eq, desc, sql, and } from 'drizzle-orm';
 
 /**
  * GET /api/user/agent/referrals

@@ -20,7 +20,6 @@ import {
     Users,
     Copy,
     Check,
-    Settings,
     Edit2,
     X
 } from 'lucide-react';
@@ -80,7 +79,7 @@ export default function AgentTeamPage() {
             } else {
                 setError(data.error || '获取团队信息失败');
             }
-        } catch (e) {
+        } catch {
             setError('网络错误');
         } finally {
             setFetching(false);
@@ -130,7 +129,7 @@ export default function AgentTeamPage() {
             } else {
                 alert(data.error || '设置失败');
             }
-        } catch (e) {
+        } catch {
             alert('网络错误');
         } finally {
             setSaving(false);
@@ -204,8 +203,8 @@ export default function AgentTeamPage() {
                                 key={tab.key}
                                 onClick={() => setActiveTab(tab.key)}
                                 className={`flex-1 py-2 px-3 rounded-full text-sm font-medium transition-all ${activeTab === tab.key
-                                        ? 'bg-primary text-white'
-                                        : 'text-foreground/60 hover:text-foreground'
+                                    ? 'bg-primary text-white'
+                                    : 'text-foreground/60 hover:text-foreground'
                                     }`}
                             >
                                 {tab.label}
@@ -228,8 +227,8 @@ export default function AgentTeamPage() {
                                 <button
                                     onClick={copyInviteLink}
                                     className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all ${copied
-                                            ? 'bg-green-500 text-white'
-                                            : 'bg-primary text-white active:scale-95'
+                                        ? 'bg-green-500 text-white'
+                                        : 'bg-primary text-white active:scale-95'
                                         }`}
                                 >
                                     {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}

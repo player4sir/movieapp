@@ -14,12 +14,12 @@ export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
         const repository = new AgentProfileRepository();
-        // @ts-ignore
         const result = await repository.list(searchParams);
 
         return NextResponse.json(result);
-    } catch (error: any) {
-        return NextResponse.json({ message: error.message || 'Failed to fetch profiles' }, { status: 500 });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to fetch profiles';
+        return NextResponse.json({ message }, { status: 500 });
     }
 }
 
@@ -55,8 +55,9 @@ export async function PUT(request: NextRequest) {
         }
 
         return NextResponse.json({ data: result });
-    } catch (error: any) {
-        return NextResponse.json({ message: error.message || 'Action failed' }, { status: 500 });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Action failed';
+        return NextResponse.json({ message }, { status: 500 });
     }
 }
 
@@ -94,7 +95,8 @@ export async function DELETE(request: NextRequest) {
         }
 
         return NextResponse.json({ success: true, message: '删除成功' });
-    } catch (error: any) {
-        return NextResponse.json({ message: error.message || '删除失败' }, { status: 500 });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : '删除失败';
+        return NextResponse.json({ message }, { status: 500 });
     }
 }

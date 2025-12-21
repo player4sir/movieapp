@@ -71,7 +71,7 @@ export default function AgentSharePage() {
                 } else {
                     setError(result.message || '无法获取推广信息');
                 }
-            } catch (e) {
+            } catch {
                 setError('网络错误，请重试');
             } finally {
                 setFetching(false);

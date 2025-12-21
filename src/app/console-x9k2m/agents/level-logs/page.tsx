@@ -8,7 +8,7 @@
 import { useState } from 'react';
 import useSWR from 'swr';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
-import { useToast, PageHeader } from '@/components/admin';
+import { PageHeader } from '@/components/admin';
 
 interface LevelChangeLog {
     id: string;
@@ -25,7 +25,6 @@ interface LevelChangeLog {
 
 export default function AgentLevelLogsPage() {
     const { getAccessToken } = useAdminAuth();
-    const { showToast } = useToast();
     const [page, setPage] = useState(1);
 
     const fetcher = async (url: string) => {

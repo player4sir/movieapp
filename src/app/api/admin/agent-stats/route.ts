@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, isAuthError } from '@/lib/auth-middleware';
 import { db } from '@/db';
 import { agentProfiles, agentLevels } from '@/db/schema';
-import { eq, sql, and } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 
 export async function GET(request: NextRequest) {
     const authResult = await requireAdmin(request);

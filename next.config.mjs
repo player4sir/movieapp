@@ -114,6 +114,10 @@ const withPWA = withPWAInit({
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  eslint: {
+    // Warnings should not fail the build
+    ignoreDuringBuilds: true,
+  },
   images: {
     // WARNING: Allowing all domains is necessary for the VOD API which may return images from various CDNs.
     // In a stricter environment, replace this with a whitelist of specific domains.

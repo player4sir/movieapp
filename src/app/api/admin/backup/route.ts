@@ -5,6 +5,7 @@ import { backupService } from '@/services/backup.service';
 // Force dynamic to avoid static generation issues
 export const dynamic = 'force-dynamic';
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function GET(_request: NextRequest) {
     try {
         // 1. Auth check (Basic implementation, enhance with actual admin check)
